@@ -1,0 +1,52 @@
+<!--
+  Widget Type: AI Chat
+  Attribute: widget="ai-chat"
+
+  Configurable (replaced by user settings):
+  - Bot name / label (e.g. "VC Sheet")
+  - Welcome message text (bot's initial bubble)
+  - Suggested prompt pills (text + link for each)
+  - Chat input placeholder text
+  - Send button icons
+
+  Static structure:
+  - Chat bubble layout (bot vs user sides)
+  - Timestamp labels
+  - Messaging input bar
+-->
+<div widget="ai-chat" class="widget-content ai-chat">
+  <div class="tldrchats">
+    <div class="glancechat-block">
+      <div class="tldrchat-bubble">
+        <div>Welcome to VC Sheet! Can we help you find the right investor? Provide you with funraising advice?</div>
+      </div>
+      <div class="glancechat-label">VC Sheet •  2 min ago</div>
+    </div>
+    <div class="glancechat-block userchat-block">
+      <div class="tldrchat-bubble userchat">
+        <div>Welcome to VC Sheet! Can we help you find the right investor? Provide you with funraising advice?</div>
+      </div>
+      <div class="glancechat-label">You •  2 min ago</div>
+    </div>
+  </div>
+  <div class="glancechat-messaging">
+    <div class="suggested-prompts-wrapper">
+      <a href="#" class="suggested-prompt-pill w-inline-block">
+        <div>Find the Right Investors</div>
+      </a>
+      <a href="#" class="suggested-prompt-pill w-inline-block">
+        <div>Fundraising Advice</div>
+      </a>
+      <a href="#" class="suggested-prompt-pill w-inline-block">
+        <div>About VC Sheet</div>
+      </a>
+      <a href="#" class="suggested-prompt-pill w-inline-block">
+        <div>Fun Raising Podcast</div>
+      </a>
+    </div>
+    <div class="glancechat-field">
+      <a href="#" class="tldrchat-send-button w-inline-block"><img loading="lazy" src="images/sendwaves.svg" alt="" class="sendwaves"><img loading="lazy" src="images/sendicon.svg" alt="" class="sendicon"></a>
+      <div class="glancechat-placeholder">Type your message here...</div>
+    </div>
+  </div>
+</div>

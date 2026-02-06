@@ -1,0 +1,106 @@
+# Glance Project — Cursor Rules
+
+## ⚠️ CRITICAL: Development Workflow
+
+**Read PROJECT.md first.** It contains the full product specification. Understand what Glance is before writing any code.
+
+**Build from HTML, not from the spec.** The spec is context, not a build order. I will provide HTML files one at a time. Your job is to reproduce them exactly — static, no behavior, no wiring.
+
+### The Rules
+
+1. **DO NOT think ahead.**
+   - Do not implement functionality I haven't explicitly requested
+   - Do not wire up buttons, forms, or navigation preemptively
+   - Do not create API routes or database queries until told to
+   - Do not infer behavior from PROJECT.md — it describes the finished product, not the current task
+
+2. **DO NOT assume.**
+   - If something is ambiguous, ask
+   - If you're unsure whether to add behavior, don't — ask first
+   - If the HTML seems incomplete, implement what's there, then ask
+
+3. **Match the HTML exactly.**
+   - Preserve class names, attributes, and structure as provided
+   - Do not rename classes to match conventions unless I ask
+   - Do not restructure markup for "better" semantics unless I ask
+   - The HTML I provide is the source of truth for UI
+
+4. **Keep it static until told otherwise.**
+   - No API calls
+   - No state management (unless purely for UI like tabs/modals)
+   - No data fetching
+   - No form submissions
+   - Render the HTML as a static page, nothing more
+
+5. **One page at a time.**
+   - Focus entirely on the current HTML file
+   - Do not touch other files unless the current task requires it
+   - Do not refactor or reorganize in anticipation of future needs
+
+6. **No premature abstraction.**
+   - Do not extract components until I ask
+   - Do not create shared utilities until I ask
+   - Do not DRY up code until I ask
+   - We will refactor together when it makes sense
+
+---
+
+## Code Style
+
+### TypeScript / JavaScript
+- TypeScript for all dashboard code
+- Vanilla JS for widget (no TypeScript in widget bundle)
+- Functional components with hooks for React (dashboard)
+- No default exports except Next.js pages
+- Use named exports everywhere else
+
+### Naming
+- Files: kebab-case (e.g., `knowledge-source.ts`)
+- Components: PascalCase (e.g., `TabConfig.tsx`)
+- Functions/variables: camelCase
+- Database columns: snake_case
+- API routes: kebab-case
+
+### File Organization
+- One component per file
+- Co-locate component-specific styles and types
+- Shared types in `packages/shared/types.ts`
+
+---
+
+## Widget Specific
+
+- All widget code must work without any npm dependencies at runtime
+- Shadow DOM: never use `document.querySelector` from inside widget — use `this.shadowRoot`
+- All styles injected via `<style>` tag inside shadow root
+- Theme color always referenced as CSS custom property, never hardcoded
+- Target bundle size: <15-20KB gzipped
+
+---
+
+## Dashboard Specific
+
+- Use Tailwind utility classes, no custom CSS unless necessary
+- Server components by default, client components only when needed
+- API routes handle all business logic — no business logic in components
+
+---
+
+## Database
+
+- All queries through Supabase client library
+- Use Row Level Security (RLS) for multi-tenant isolation
+- Migrations in `supabase/migrations/` with descriptive names
+
+---
+
+## Git
+
+- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`
+- Feature branches off main
+
+---
+
+## When In Doubt
+
+**Ask.** Do not guess. Do not infer. Do not "help" by doing more than requested. The goal is precise, incremental implementation — not speed.

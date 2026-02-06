@@ -1,0 +1,129 @@
+<!--
+  Widget Type: Account / Auth Gate
+  Attribute: widget="account"
+
+  Configurable (replaced by user settings):
+  - Hero banner image
+  - Tab heading text (e.g. "Premium Content")
+  - Tab subheading text (e.g. "Login or create your FREE account...")
+  - Google auth button (enabled/disabled, icon)
+  - Magic link label text
+  - Additional form fields for account creation:
+    - First Name
+    - Last Name
+  - Submit button text per flow state
+  - Resend link text
+
+  Auth flow states (distinguished by account-flow="..." attribute):
+  - "default": Initial state with Google auth + email input + "Send Magic Code" button
+  - "magic-create": Code entry + additional fields (First/Last Name) + "Create Account" button
+  - "magic-login": Code entry only + "Login" button (returning user)
+
+  Static structure:
+  - Hero image container with no-pull class
+  - Centered heading/subheading wrap
+  - Google auth button with icon
+  - Divider with "Or Use Magical Link" label
+  - Email input field
+  - Magic code input field
+  - Success/error message containers per form
+-->
+<div widget="account" class="widget-content account">
+  <div class="tabhero no-pull"><img sizes="(max-width: 4100px) 100vw, 4100px" srcset="images/BannerForm-p-500.png 500w, images/BannerForm-p-800.png 800w, images/BannerForm-p-1080.png 1080w, images/BannerForm-p-1600.png 1600w, images/BannerForm-p-2000.png 2000w, images/BannerForm-p-2600.png 2600w, images/BannerForm-p-3200.png 3200w, images/BannerForm.png 4100w" alt="" src="images/BannerForm.png" loading="lazy" class="full-image"></div>
+  <div class="tabheading-wrap center">
+    <div class="tab-heading">Premium Content</div>
+    <div class="tab-subheading">Login or create your FREE account to access this content.</div>
+  </div>
+  <div class="formcontent-wrap">
+    <!-- Default flow: Google auth + email magic link -->
+    <div class="w-form">
+      <form id="wf-form-Account-Form" name="wf-form-Account-Form" data-name="Account Form" method="get" account-flow="default" class="formwrap loginwrap" data-wf-page-id="6984c4124dedf6cd699f01d2" data-wf-element-id="69912a5a-4eaa-6bac-981b-2ef3f97fd1f7">
+        <div>
+          <a href="#" class="google-auth-button w-inline-block"><img src="images/adTFhODz_400x400.jpg" loading="lazy" alt="" class="google-icon">
+            <div>Continue with Google</div>
+          </a>
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="labeldivider"></div>
+            <div class="formlabel smalldim">Or Use Magical Link</div>
+            <div class="labeldivider"></div>
+          </div>
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Email Address</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields w-input" maxlength="256" name="Email-Address" data-name="Email Address" placeholder="" type="email" id="Email-Address">
+        </div><input type="submit" data-wait="Please wait..." class="formbutton w-button" value="Send Magic Code">
+      </form>
+      <div class="w-form-done">
+        <div>Thank you! Your submission has been received!</div>
+      </div>
+      <div class="w-form-fail">
+        <div>Oops! Something went wrong while submitting the form.</div>
+      </div>
+    </div>
+    <!-- Magic link flow: New user - code + create account fields -->
+    <div class="w-form">
+      <form id="wf-form-Magic-Create" name="wf-form-Magic-Create" data-name="Magic Create" method="get" account-flow="magic-create" class="formwrap loginwrap" data-wf-page-id="6984c4124dedf6cd699f01d2" data-wf-element-id="26e1da9c-0a18-2a1d-1df0-2e1b23c1f924">
+        <div class="tabheading-wrap center">
+          <div class="tab-heading">A 6-digit code has been sent to your email</div>
+          <div class="tab-subheading">Didn&#x27;t get it? <a href="#">Resend now.</a>
+          </div>
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Secret Code</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields w-input" maxlength="256" name="Secret-Code" data-name="Secret Code" placeholder="" type="text" id="Secret-Code" required="">
+        </div>
+        <div class="labelrow">
+          <div class="labeldivider"></div>
+          <div class="formlabel smalldim">Additional Details Needed</div>
+          <div class="labeldivider"></div>
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">First Name</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields w-input" maxlength="256" name="First-Name" data-name="First Name" placeholder="" type="text" id="First-Name" required="">
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Last Name</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields w-input" maxlength="256" name="Last-Name" data-name="Last Name" placeholder="" type="text" id="Last-Name" required="">
+        </div><input type="submit" data-wait="Please wait..." class="formbutton w-button" value="Create Account">
+      </form>
+      <div class="w-form-done">
+        <div>Thank you! Your submission has been received!</div>
+      </div>
+      <div class="w-form-fail">
+        <div>Oops! Something went wrong while submitting the form.</div>
+      </div>
+    </div>
+    <!-- Magic link flow: Returning user - code only -->
+    <div class="w-form">
+      <form id="wf-form-Magic-Login" name="wf-form-Magic-Login" data-name="Magic Login" method="get" account-flow="magic-create" class="formwrap loginwrap" data-wf-page-id="6984c4124dedf6cd699f01d2" data-wf-element-id="594f4592-fc27-3cd5-dae4-328fd5b045db">
+        <div class="tabheading-wrap center">
+          <div class="tab-heading">A 6-digit code has been sent to your email</div>
+          <div class="tab-subheading">Didn&#x27;t get it? <a href="#">Resend now.</a>
+          </div>
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Secret Code</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields w-input" maxlength="256" name="Secret-Code" data-name="Secret Code" placeholder="" type="text" id="Secret-Code" required="">
+        </div><input type="submit" data-wait="Please wait..." class="formbutton w-button" value="Login">
+      </form>
+      <div class="w-form-done">
+        <div>Thank you! Your submission has been received!</div>
+      </div>
+      <div class="w-form-fail">
+        <div>Oops! Something went wrong while submitting the form.</div>
+      </div>
+    </div>
+  </div>
+</div>

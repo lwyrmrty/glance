@@ -1,0 +1,24 @@
+{
+  "name": "glance",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/dashboard",
+    "build": "npm run build --workspace=apps/dashboard",
+    "lint": "npm run lint --workspace=apps/dashboard",
+    "db:start": "npx supabase start",
+    "db:stop": "npx supabase stop",
+    "db:reset": "npx supabase db reset",
+    "db:migrate": "npx supabase migration new",
+    "db:push": "npx supabase db push",
+    "db:pull": "npx supabase db pull",
+    "db:link": "npx supabase link --project-ref eluxtvpthgceyhbyxbdu",
+    "db:gen-types": "npx supabase gen types typescript --linked > packages/shared/database.types.ts"
+  },
+  "devDependencies": {
+    "supabase": "^2.75.5"
+  }
+}

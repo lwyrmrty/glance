@@ -1,0 +1,21 @@
+<!--
+  Widget Type: 3rd Party Embed
+  Attribute: widget="3rd-party"
+
+  Configurable (replaced by user settings):
+  - Provider type (distinguished by thirdparty="..." attribute):
+    - calendly: Calendar scheduling embed
+    - tally: Tally form embed
+    - typeform: Typeform embed
+  - Iframe source URL for each provider
+
+  Static structure:
+  - Container div with _3rd-party class
+  - One iframe embed div per provider (thirdparty attribute identifies which)
+  - Each iframe is 100% width and height
+-->
+<div widget="3rd-party" class="widget-content _3rd-party">
+  <div thirdparty="calendly" class="_3rd-party-code-embed w-embed w-iframe"><iframe src="https://calendly.com/matvogels/fun-raising" width="100%" height="100%" frameborder="0"></iframe></div>
+  <div thirdparty="tally" class="_3rd-party-code-embed w-embed w-iframe"><iframe src="https://tally.so/embed/BzxpER?hideTitle=1&transparentBackground=1" width="100%" height="100%" frameborder="0"></iframe></div>
+  <div thirdparty="typeform" class="_3rd-party-code-embed w-embed w-iframe"><iframe src="https://form.typeform.com/to/YOUR_FORM_ID" width="100%" height="100%" frameborder="0"></iframe></div>
+</div>

@@ -1,0 +1,181 @@
+<!--
+  Widget Type: Form
+  Attribute: widget="forms"
+
+  Configurable (replaced by user settings):
+  - Hero banner image
+  - Tab heading text (e.g. "DeckMatch")
+  - Tab subheading text
+  - Form fields: each field has a type and label. Supported types:
+    - Text (class: textfield)
+    - Email (class: emailfield)
+    - URL (class: urlfield)
+    - Phone (class: phonefield)
+    - Checkboxes - single select (with "Select one" label)
+    - Checkboxes - multi select (with "Select Multiple" label)
+    - File upload (with size limit label)
+  - Submit button text
+  - Success message text + icon
+  - Error message text
+
+  Static structure:
+  - Hero image container with no-pull class
+  - Heading/subheading wrap
+  - Form field blocks with label rows and dividers
+  - Checkbox rows with check icon SVG
+  - File upload area with upload icon SVG
+  - Uploaded file preview (thumbnail + filename + size + delete link)
+  - Success/error message containers
+-->
+<div widget="forms" class="widget-content forms">
+  <div class="tabhero no-pull"><img sizes="(max-width: 4100px) 100vw, 4100px" srcset="images/BannerForm-p-500.png 500w, images/BannerForm-p-800.png 800w, images/BannerForm-p-1080.png 1080w, images/BannerForm-p-1600.png 1600w, images/BannerForm-p-2000.png 2000w, images/BannerForm-p-2600.png 2600w, images/BannerForm-p-3200.png 3200w, images/BannerForm.png 4100w" alt="" src="images/BannerForm.png" loading="lazy" class="full-image"></div>
+  <div class="tabheading-wrap">
+    <div class="tab-heading">DeckMatch</div>
+    <div class="tab-subheading">Upload your deck, we&#x27;ll analyze it and match you with top funds across our database.</div>
+  </div>
+  <div class="formcontent-wrap">
+    <div class="formblocks w-form">
+      <form id="wf-form-Email-Form-Mock" name="wf-form-Email-Form-Mock" data-name="Email Form Mock" method="get" class="formwrap" data-wf-page-id="6984c4124dedf6cd699f01d2" data-wf-element-id="013159c1-e8cb-87a0-48d0-75446caf2a14">
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Full Name</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields textfield w-input" maxlength="256" name="Text-Field" data-name="Text Field" placeholder="" type="text" id="Text-Field">
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Email Address</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields emailfield w-input" maxlength="256" name="Email-Field" data-name="Email Field" placeholder="" type="email" id="Email-Field">
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Website</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields urlfield w-input" maxlength="256" name="URL-Field" data-name="URL Field" placeholder="" type="url" id="URL-Field">
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Phone Number</div>
+            <div class="labeldivider"></div>
+          </div><input class="formfields phonefield w-input" maxlength="256" name="Phone-Field" data-name="Phone Field" placeholder="" type="tel" id="Phone-Field">
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Checkboxes</div>
+            <div class="formlabel labelinfo">Select one</div>
+            <div class="labeldivider"></div>
+          </div>
+          <div class="checkboxeswrapper">
+            <div class="checkboxrow">
+              <div class="checkboxblock"></div>
+              <div>Checkbox item</div>
+            </div>
+            <div class="checkboxrow">
+              <div class="checkboxblock">
+                <div class="checkboxchecked"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewbox="0 0 24 24" fill="none" app="ikonik" class="checkboxicon">
+                    <defs app="ikonik">
+                      <clippath app="ikonik">
+                        <rect width="24" height="24" fill="currentColor" app="ikonik" class="rect-ubwtw"></rect>
+                      </clippath>
+                    </defs>
+                    <g clip-path="url(#clip0_203_28722)" app="ikonik">
+                      <path d="M7.74919 20.6625C7.06793 20.6628 6.41457 20.392 5.93325 19.9099L0.443061 14.4217C-0.147687 13.8308 -0.147687 12.8729 0.443061 12.282C1.034 11.6912 1.99191 11.6912 2.58284 12.282L7.74919 17.4483L21.4172 3.78034C22.0081 3.18959 22.966 3.18959 23.5569 3.78034C24.1477 4.37128 24.1477 5.32919 23.5569 5.92012L9.56513 19.9099C9.08381 20.392 8.43045 20.6628 7.74919 20.6625Z" fill="currentColor" app="ikonik" class="path-jcy3z"></path>
+                    </g>
+                  </svg></div>
+              </div>
+              <div>Checkbox item</div>
+            </div>
+            <div class="checkboxrow">
+              <div class="checkboxblock"></div>
+              <div>Checkbox item</div>
+            </div>
+          </div>
+        </div>
+        <div class="formfield-block">
+          <div class="labelrow">
+            <div class="formlabel">Checkboxes</div>
+            <div class="formlabel smalldim">Select Multiple</div>
+            <div class="labeldivider"></div>
+          </div>
+          <div class="checkboxeswrapper">
+            <div class="checkboxrow">
+              <div class="checkboxblock">
+                <div class="checkboxchecked"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewbox="0 0 24 24" fill="none" app="ikonik" class="checkboxicon">
+                    <defs app="ikonik">
+                      <clippath app="ikonik">
+                        <rect width="24" height="24" fill="currentColor" app="ikonik" class="rect-ubwtw"></rect>
+                      </clippath>
+                    </defs>
+                    <g clip-path="url(#clip0_203_28722)" app="ikonik">
+                      <path d="M7.74919 20.6625C7.06793 20.6628 6.41457 20.392 5.93325 19.9099L0.443061 14.4217C-0.147687 13.8308 -0.147687 12.8729 0.443061 12.282C1.034 11.6912 1.99191 11.6912 2.58284 12.282L7.74919 17.4483L21.4172 3.78034C22.0081 3.18959 22.966 3.18959 23.5569 3.78034C24.1477 4.37128 24.1477 5.32919 23.5569 5.92012L9.56513 19.9099C9.08381 20.392 8.43045 20.6628 7.74919 20.6625Z" fill="currentColor" app="ikonik" class="path-jcy3z"></path>
+                    </g>
+                  </svg></div>
+              </div>
+              <div>Checkbox item</div>
+            </div>
+            <div class="checkboxrow">
+              <div class="checkboxblock">
+                <div class="checkboxchecked"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewbox="0 0 24 24" fill="none" app="ikonik" class="checkboxicon">
+                    <defs app="ikonik">
+                      <clippath app="ikonik">
+                        <rect width="24" height="24" fill="currentColor" app="ikonik" class="rect-ubwtw"></rect>
+                      </clippath>
+                    </defs>
+                    <g clip-path="url(#clip0_203_28722)" app="ikonik">
+                      <path d="M7.74919 20.6625C7.06793 20.6628 6.41457 20.392 5.93325 19.9099L0.443061 14.4217C-0.147687 13.8308 -0.147687 12.8729 0.443061 12.282C1.034 11.6912 1.99191 11.6912 2.58284 12.282L7.74919 17.4483L21.4172 3.78034C22.0081 3.18959 22.966 3.18959 23.5569 3.78034C24.1477 4.37128 24.1477 5.32919 23.5569 5.92012L9.56513 19.9099C9.08381 20.392 8.43045 20.6628 7.74919 20.6625Z" fill="currentColor" app="ikonik" class="path-jcy3z"></path>
+                    </g>
+                  </svg></div>
+              </div>
+              <div>Checkbox item</div>
+            </div>
+            <div class="checkboxrow">
+              <div class="checkboxblock"></div>
+              <div>Checkbox item</div>
+            </div>
+          </div>
+        </div>
+        <div class="formfield-block upload">
+          <div class="labelrow">
+            <div class="formlabel">Upload Pitch Deck</div>
+            <div class="labeldivider"></div>
+          </div>
+          <div class="formupload"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewbox="0 0 24 24" fill="none" app="ikonik" class="uploadicons">
+              <path d="M8 16L12 12M12 12L16 16M12 12V22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" app="ikonik" class="path-rp16ki"></path>
+              <path d="M6.3414 6.15897C7.16507 3.73597 9.38755 2 12 2C15.3137 2 18 4.79305 18 8.23846C20.2091 8.23846 22 10.1005 22 12.3974C22 13.9368 21.1956 15.2809 20 16M6.32069 6.20644C3.8806 6.55106 2 8.72597 2 11.3576C2 13.0582 2.7854 14.5682 3.99965 15.5167" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" app="ikonik" class="path-v8sxp"></path>
+            </svg>
+            <div>
+              <div>Upload</div>
+              <div class="uploadlabel">Up to 50MB</div>
+            </div>
+          </div>
+          <div class="stylefield-block h4n">
+            <div class="thumbnailpreview square"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewbox="0 0 24 24" fill="none" app="ikonik" class="uploadedicon">
+                <g app="ikonik">
+                  <path d="M9 17H15M9 14H15M13.0004 3.00087C12.9048 3 12.7974 3 12.6747 3H8.2002C7.08009 3 6.51962 3 6.0918 3.21799C5.71547 3.40973 5.40973 3.71547 5.21799 4.0918C5 4.51962 5 5.08009 5 6.2002V17.8002C5 18.9203 5 19.4801 5.21799 19.9079C5.40973 20.2842 5.71547 20.5905 6.0918 20.7822C6.51921 21 7.079 21 8.19694 21L15.8031 21C16.921 21 17.48 21 17.9074 20.7822C18.2837 20.5905 18.5905 20.2842 18.7822 19.9079C19 19.4805 19 18.9215 19 17.8036V9.32568C19 9.20302 18.9999 9.09553 18.999 9M13.0004 3.00087C13.2858 3.00348 13.4657 3.01407 13.6382 3.05547C13.8423 3.10446 14.0379 3.18526 14.2168 3.29492C14.4186 3.41857 14.5918 3.59181 14.9375 3.9375L18.063 7.06298C18.4089 7.40889 18.5809 7.58136 18.7046 7.78319C18.8142 7.96214 18.8953 8.15726 18.9443 8.36133C18.9857 8.53379 18.9964 8.71454 18.999 9M13.0004 3.00087L13 5.80021C13 6.92031 13 7.48015 13.218 7.90797C13.4097 8.2843 13.7155 8.59048 14.0918 8.78223C14.5192 9 15.079 9 16.1969 9H18.999" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" app="ikonik" class="path-wpq01"></path>
+                </g>
+              </svg></div>
+            <div class="uploadedcontent">
+              <div class="uploadtitle">logofilefinal.jpg</div>
+              <div class="uploadsubtitle">342kb</div>
+              <div class="uploadactions">
+                <a href="#" class="deletelink">Delete</a>
+              </div>
+            </div>
+          </div>
+        </div><input type="submit" data-wait="Please wait..." class="formbutton w-button" value="Submit">
+      </form>
+      <div class="successmessage w-form-done">
+        <div class="success-message-content"><img src="images/party-popper_1f389.png" loading="lazy" alt="" class="success-icon">
+          <div>Thank you! Your submission has been received! Check your email in ~5 minutes for the final result.</div>
+          <a href="#" class="button success-button w-inline-block">
+            <div>Back to form</div>
+          </a>
+        </div>
+      </div>
+      <div class="w-form-fail">
+        <div>Oops! Something went wrong while submitting the form.</div>
+      </div>
+    </div>
+  </div>
+</div>
