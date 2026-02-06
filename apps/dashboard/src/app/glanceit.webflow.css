@@ -3069,7 +3069,7 @@ em {
   border: 1.5px solid #ffffff1a;
   border-radius: 20px;
   flex-flow: column;
-  width: 390px;
+  width: 410px;
   max-width: 100%;
   padding: 7px;
   display: flex;
@@ -3590,8 +3590,10 @@ em {
   grid-row-gap: 20px;
   flex-flow: column;
   justify-content: center;
-  align-items: stretch;
+  align-items: center;
+  text-align: center;
   height: 100%;
+  padding: 0 23px;
   font-size: 19px;
   line-height: 1.5em;
   display: flex;
