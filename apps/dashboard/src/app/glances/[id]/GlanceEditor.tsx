@@ -147,7 +147,8 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     savedPrompts.length === 3 ? savedPrompts : defaultPrompts
   )
 
-  const tabLinks = ['VC Chat', 'Deck Match', 'Feedback', 'Podcast', 'About']
+  // Derive link pills from the actual configured tabs (only tabs with a name)
+  const tabLinks = tabs.filter(t => t.name.trim() !== '').map(t => t.name)
 
   const updatePrompt = (index: number, field: 'text' | 'link', value: string) => {
     setPrompts(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p))
@@ -724,22 +725,26 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                           value={calloutUrl}
                           onChange={(e) => setCalloutUrl(e.target.value)}
                         />
-                        <div className="alignrow aligncenter">
+                        <div className="alignrow aligncenter wrap">
                           <div className="labeltext">Links:</div>
                           {/* Smart links - these will link to tabs within the widget */}
-                          {['VC Chat', 'Deck Match', 'Feedback', 'Podcast', 'About'].map((tabName) => (
-                            <a 
-                              key={tabName} 
-                              href="#" 
-                              className="calloutpill w-inline-block"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                setCalloutUrl(`#glance-${tabName.toLowerCase().replace(/\s+/g, '-')}`)
-                              }}
-                            >
-                              <div>{tabName}</div>
-                            </a>
-                          ))}
+                          {tabLinks.map((tabName) => {
+                            const hash = `#glance-${tabName.toLowerCase().replace(/\s+/g, '-')}`
+                            const isSelected = calloutUrl === hash
+                            return (
+                              <a 
+                                key={tabName} 
+                                href="#" 
+                                className={`calloutpill w-inline-block${isSelected ? ' selected' : ''}`}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  setCalloutUrl(calloutUrl === hash ? '' : hash)
+                                }}
+                              >
+                                <div>{tabName}</div>
+                              </a>
+                            )
+                          })}
                         </div>
                       </div>
 

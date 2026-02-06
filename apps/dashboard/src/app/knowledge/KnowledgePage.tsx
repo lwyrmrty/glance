@@ -7,13 +7,7 @@ import { useToast } from '@/components/Toast'
 // Document icon SVG used for markdown/text file sources
 function DocIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className={className}>
-      <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M14 2V8H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M16 13H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M16 17H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M10 9H9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
+    <img src="/images/doc-icon.png" alt="Document" className={className} style={{ objectFit: 'contain' }} />
   )
 }
 
@@ -57,7 +51,7 @@ const sourceTypeIcons: Record<string, string> = {
   google_sheet: '/images/google-sheets.png',
   airtable_base: '/images/airtable.png',
   airtable_table: '/images/airtable.png',
-  markdown: 'doc',
+  markdown: '/images/doc-icon.png',
   url: 'globe',
   text: 'globe',
 }
@@ -93,8 +87,59 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
   const [loadingTables, setLoadingTables] = useState(false)
 
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
   const selectedSource = sources.find(s => s.id === selectedSourceId)
   const hasSources = sources.length > 0
+  const allSelected = hasSources && selectedIds.size === sources.length
+  const someSelected = selectedIds.size > 0
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sources.map(s => s.id)))
+    }
+  }
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const count = selectedIds.size
+    if (!confirm(`Delete ${count} knowledge source${count > 1 ? 's' : ''}? This cannot be undone.`)) return
+
+    try {
+      const idsToDelete = Array.from(selectedIds)
+      await Promise.all(
+        idsToDelete.map(id =>
+          fetch(`/api/knowledge?id=${id}`, { method: 'DELETE' })
+        )
+      )
+      setSources(prev => prev.filter(s => !selectedIds.has(s.id)))
+      // If the currently viewed source was deleted, close the panel
+      if (selectedSourceId && selectedIds.has(selectedSourceId)) {
+        setSelectedSourceId(null)
+        setPanelView('empty')
+      }
+      setSelectedIds(new Set())
+      showToast(`Deleted ${count} source${count > 1 ? 's' : ''}`, 'success')
+    } catch (err) {
+      console.error('Bulk delete error:', err)
+      showToast('Failed to delete some sources', 'error')
+    }
+  }
 
   const handleViewEdit = (e: React.MouseEvent, sourceId: string) => {
     e.preventDefault()
@@ -346,30 +391,17 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                     <div className="tablerow header">
                       <div className="tablerow-left">
                         <div className="tableblock">
-                          <div className="checkboxwrapper">
-                            <div className="checkboxelement"></div>
+                          <div className="checkboxwrapper" onClick={toggleSelectAll} style={{ cursor: 'pointer' }}>
+                            <div className={`checkboxelement${allSelected ? ' checked' : ''}`}></div>
                           </div>
                           <div className="bulkactions-row">
-                            <a href="#" className="bulkaction-button delete w-inline-block" onClick={(e) => e.preventDefault()}>
+                            <a href="#" className={`bulkaction-button delete w-inline-block${!someSelected ? ' disabled' : ''}`} onClick={(e) => { e.preventDefault(); handleBulkDelete() }} style={!someSelected ? { opacity: 0.4, pointerEvents: 'none' } : {}}>
                               <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="actionicon">
                                 <path d="M14.5 18C15.3284 18 16 17.3284 16 16.5V10.5C16 9.67158 15.3284 9 14.5 9C13.6716 9 13 9.67158 13 10.5V16.5C13 17.3284 13.6716 18 14.5 18Z" fill="currentColor"></path>
                                 <path d="M9.5 18C10.3284 18 11 17.3284 11 16.5V10.5C11 9.67158 10.3284 9 9.5 9C8.67158 9 8 9.67158 8 10.5V16.5C8 17.3284 8.67158 18 9.5 18Z" fill="currentColor"></path>
                                 <path d="M23 4.5C23 3.67158 22.3285 3 21.5 3H17.724C17.0921 1.20736 15.4007 0.00609375 13.5 0H10.5C8.59928 0.00609375 6.90789 1.20736 6.27602 3H2.5C1.67158 3 1 3.67158 1 4.5C1 5.32842 1.67158 6 2.5 6H3.00002V18.5C3.00002 21.5376 5.46245 24 8.5 24H15.5C18.5376 24 21 21.5376 21 18.5V6H21.5C22.3285 6 23 5.32842 23 4.5ZM18 18.5C18 19.8807 16.8807 21 15.5 21H8.5C7.1193 21 6.00002 19.8807 6.00002 18.5V6H18V18.5Z" fill="currentColor"></path>
                               </svg>
                               <div>Delete</div>
-                            </a>
-                            <a href="#" className="bulkaction-button w-inline-block" onClick={(e) => e.preventDefault()}>
-                              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="actionicon">
-                                <defs>
-                                  <clipPath>
-                                    <rect width="24" height="24" fill="currentColor"></rect>
-                                  </clipPath>
-                                </defs>
-                                <g clipPath="url(#clip0_203_28818)">
-                                  <path d="M18.0001 13.4999V7.57093C18.0035 6.71662 17.8373 5.87013 17.5111 5.08051C17.185 4.2909 16.7054 3.57385 16.1001 2.97093L15.0251 1.89993C14.4222 1.29467 13.7052 0.815067 12.9155 0.488922C12.1259 0.162777 11.2794 -0.0034315 10.4251 -7.21461e-05H7.50012C6.04192 0.00151602 4.64389 0.581489 3.61279 1.61259C2.58168 2.6437 2.00171 4.04173 2.00012 5.49993V13.4999C2.00171 14.9581 2.58168 16.3562 3.61279 17.3873C4.64389 18.4184 6.04192 18.9983 7.50012 18.9999H12.5001C13.9583 18.9983 15.3563 18.4184 16.3875 17.3873C17.4186 16.3562 17.9985 14.9581 18.0001 13.4999ZM5.00012 13.4999V5.49993C5.00012 4.83689 5.26351 4.201 5.73236 3.73216C6.2012 3.26332 6.83708 2.99993 7.50012 2.99993H10.4291C10.6207 3.00294 10.8116 3.02167 11.0001 3.05593V4.99993C11.0001 5.53036 11.2108 6.03907 11.5859 6.41414C11.961 6.78922 12.4697 6.99993 13.0001 6.99993H14.9441C14.9784 7.18841 14.9971 7.37938 15.0001 7.57093V13.4999C15.0001 14.163 14.7367 14.7989 14.2679 15.2677C13.799 15.7365 13.1632 15.9999 12.5001 15.9999H7.50012C6.83708 15.9999 6.2012 15.7365 5.73236 15.2677C5.26351 14.7989 5.00012 14.163 5.00012 13.4999ZM23.0001 8.49993V18.4999C22.9985 19.9581 22.4186 21.3562 21.3875 22.3873C20.3563 23.4184 18.9583 23.9983 17.5001 23.9999H9.50012C9.1023 23.9999 8.72077 23.8419 8.43946 23.5606C8.15816 23.2793 8.00012 22.8978 8.00012 22.4999C8.00012 22.1021 8.15816 21.7206 8.43946 21.4393C8.72077 21.158 9.1023 20.9999 9.50012 20.9999H17.5001C18.1632 20.9999 18.799 20.7365 19.2679 20.2677C19.7367 19.7989 20.0001 19.163 20.0001 18.4999V8.49993C20.0001 8.1021 20.1582 7.72057 20.4395 7.43927C20.7208 7.15796 21.1023 6.99993 21.5001 6.99993C21.8979 6.99993 22.2795 7.15796 22.5608 7.43927C22.8421 7.72057 23.0001 8.1021 23.0001 8.49993Z" fill="currentColor"></path>
-                                </g>
-                              </svg>
-                              <div>Duplicate</div>
                             </a>
                           </div>
                         </div>
@@ -417,8 +449,8 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                             >
                               <div className="tablerow-left">
                                 <div className="tableblock">
-                                  <div className="checkboxwrapper">
-                                    <div className="checkboxelement"></div>
+                                  <div className="checkboxwrapper" onClick={(e) => { e.stopPropagation(); toggleSelectOne(source.id) }} style={{ cursor: 'pointer' }}>
+                                    <div className={`checkboxelement${selectedIds.has(source.id) ? ' checked' : ''}`}></div>
                                   </div>
                                   <div className="tableimage">
                                     {icon === 'globe' ? (

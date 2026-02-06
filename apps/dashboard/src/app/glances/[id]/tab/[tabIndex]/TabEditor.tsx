@@ -20,6 +20,7 @@ const knowledgeTypeIcons: Record<string, string> = {
   google_sheet: '/images/google-sheets.png',
   airtable_base: '/images/airtable.png',
   airtable_table: '/images/airtable.png',
+  markdown: '/images/doc-icon.png',
 }
 
 interface TabEditorProps {
