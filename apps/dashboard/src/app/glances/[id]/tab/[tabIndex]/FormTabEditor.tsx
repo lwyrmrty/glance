@@ -261,7 +261,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                                 </svg>
                               </a>
                               {openFieldDropdown === i && (
-                                <div className="widgetsmodal" style={{ display: 'flex', position: 'absolute', right: 0, top: '100%', zIndex: 50, minWidth: 400, height: 'auto' }}>
+                                <div className="widgetsmodal" style={{ display: 'flex', position: 'absolute', inset: 'auto', right: 0, top: '100%', zIndex: 50, minWidth: 400, height: 'auto' }}>
                                   <div className="widgetsmodal-block">
                                     <div className="labelrow">
                                       <div className="labeltext">Field Types</div>
@@ -292,24 +292,16 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                                 </div>
                               )}
                             </div>
-                            <div className="rowcard-action">
-                              <a
-                                href="#"
-                                className="tablebutton square w-inline-block"
-                                title="Delete field"
-                                style={{ color: '#999', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  setFormFields(prev => prev.filter((_, fi) => fi !== i))
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = '#999')}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="3 6 5 6 21 6"></polyline>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                </svg>
-                              </a>
+                            <div
+                              className="rowcard-action delete"
+                              title="Delete field"
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => setFormFields(prev => prev.filter((_, fi) => fi !== i))}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              </svg>
                             </div>
                           </div>
                         </div>

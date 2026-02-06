@@ -120,8 +120,7 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
   const widgetTypeImages: Record<string, { img: string; className: string }> = {
     'TLDR': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
     'AI Chat': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
-    'Dynamic Content': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
-    'Static Content': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
+    'Content': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
     'Gallery': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
     'Form': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
     'Poll': { img: '/images/glanceicons.svg', className: 'navicon nonactive' },
@@ -129,7 +128,6 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     'Greenhouse': { img: '/images/V7s98SAp_400x400.jpg', className: 'fullimage' },
     'Lever': { img: '/images/lever__logo.jpeg', className: 'fullimage' },
     'Tally': { img: '/images/V3mlVijc_400x400.jpg', className: 'fullimage' },
-    'Deck Feedback': { img: '/images/69700af6b63d36e29509644b_692f8a391498f0f791f2b0ff_fowwsm.webp', className: 'fullimage' },
   }
 
   const selectWidgetType = (index: number, type: string) => {
@@ -516,7 +514,7 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                                         <div className="labeldivider"></div>
                                       </div>
                                       <div className="pillswrapper">
-                                        {['TLDR', 'AI Chat', 'Dynamic Content', 'Static Content', 'Gallery', 'Form', 'Poll'].map((w) => (
+                                        {['TLDR', 'AI Chat', 'Content', 'Gallery', 'Form', 'Poll'].map((w) => (
                                           <a key={w} href="#" className={`widgetpill w-inline-block${tab.type === w ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); selectWidgetType(index, w) }}>
                                             <div className="alignrow aligncenter">
                                               <div className="navbarlink-icon sm">
@@ -549,22 +547,6 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                                             </div>
                                           </a>
                                         ))}
-                                      </div>
-                                    </div>
-                                    <div className="widgetsmodal-block">
-                                      <div className="labelrow">
-                                        <div className="labeltext">Custom</div>
-                                        <div className="labeldivider"></div>
-                                      </div>
-                                      <div className="pillswrapper">
-                                        <a href="#" className={`widgetpill w-inline-block${tab.type === 'Deck Feedback' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); selectWidgetType(index, 'Deck Feedback') }}>
-                                          <div className="alignrow aligncenter">
-                                            <div className="navbarlink-icon sm">
-                                              <img alt="" src="/images/69700af6b63d36e29509644b_692f8a391498f0f791f2b0ff_fowwsm.webp" loading="lazy" className="fullimage" />
-                                            </div>
-                                            <div>Deck Feedback</div>
-                                          </div>
-                                        </a>
                                       </div>
                                     </div>
                                   </div>

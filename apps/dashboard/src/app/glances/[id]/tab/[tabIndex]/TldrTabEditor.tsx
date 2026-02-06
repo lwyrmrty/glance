@@ -6,7 +6,7 @@ import { dragIconSvg, uploadIconSvg, socialPlatforms, type TabHookProps, type Ta
 
 export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving }: TabHookProps): TabHookResult {
   const tabType = tab.type || ''
-  const isContentTab = tabType === 'Content'
+  const isContentTab = tabType === 'Content' || tabType === 'Static Content'
   // Saved values
   const savedTldrTitle = (tab as any).tldr_title ?? ''
   const savedTldrSubtitle = (tab as any).tldr_subtitle ?? ''

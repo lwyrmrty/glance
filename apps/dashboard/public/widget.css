@@ -603,7 +603,7 @@
 .successmessage {
   background-color: var(--vcs-purple);
   color: #fff;
-  border-radius: 10px;
+  border-radius: 0;
   flex: 1;
   position: absolute;
   inset: 0;
@@ -629,16 +629,25 @@
   display: flex;
 }
 .success-back-btn {
-  margin-top: 4px;
-  font-size: 14px;
-  padding: 10px 24px;
-  border-radius: 8px;
+  margin-top: 12px;
+  font-size: 15.55px;
+  font-weight: 500;
+  padding: 10px 28px;
+  border-radius: 10px;
+  height: 50px;
   cursor: pointer;
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,0.35);
   opacity: 0.85;
-  transition: opacity 0.15s ease;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  filter: none;
 }
 .success-back-btn:hover {
   opacity: 1;
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.6);
 }
 
 .success-icon {

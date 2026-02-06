@@ -30,7 +30,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   const tabName = tab.name || 'Untitled Tab'
   const tabIcon = tab.icon || '/images/Chats.svg'
   const tabType = tab.type || 'Widget'
-  const isTldrTab = tabType === 'TLDR' || tabType === 'Content'
+  const isTldrTab = tabType === 'TLDR' || tabType === 'Content' || tabType === 'Static Content'
   const isFormTab = tabType === 'Form'
   const isChatTab = tabType === 'AI Chat'
 
