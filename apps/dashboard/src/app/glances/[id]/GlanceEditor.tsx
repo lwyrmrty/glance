@@ -520,7 +520,6 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                                           <a key={w} href="#" className={`widgetpill w-inline-block${tab.type === w ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); selectWidgetType(index, w) }}>
                                             <div className="alignrow aligncenter">
                                               <div className="navbarlink-icon sm">
-                                                <img loading="lazy" src="/images/chart-pie-alt.svg" alt="" className="navicon activeicon" />
                                                 <img loading="lazy" src="/images/glanceicons.svg" alt="" className="navicon nonactive" />
                                               </div>
                                               <div>{w}</div>
@@ -544,7 +543,6 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                                           <a key={w.name} href="#" className={`widgetpill w-inline-block${tab.type === w.name ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); selectWidgetType(index, w.name) }}>
                                             <div className="alignrow aligncenter">
                                               <div className="navbarlink-icon sm">
-                                                <img loading="lazy" src="/images/chart-pie-alt.svg" alt="" className="navicon activeicon" />
                                                 <img loading="lazy" src={w.img} alt="" className="fullimage" />
                                               </div>
                                               <div>{w.name}</div>
@@ -562,7 +560,6 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                                         <a href="#" className={`widgetpill w-inline-block${tab.type === 'Deck Feedback' ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); selectWidgetType(index, 'Deck Feedback') }}>
                                           <div className="alignrow aligncenter">
                                             <div className="navbarlink-icon sm">
-                                              <img loading="lazy" src="/images/chart-pie-alt.svg" alt="" className="navicon activeicon" />
                                               <img alt="" src="/images/69700af6b63d36e29509644b_692f8a391498f0f791f2b0ff_fowwsm.webp" loading="lazy" className="fullimage" />
                                             </div>
                                             <div>Deck Feedback</div>

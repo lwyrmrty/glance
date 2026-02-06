@@ -57,6 +57,7 @@ export function PreviewPage({ glance }: PreviewPageProps) {
   const [activeTabIndex, setActiveTabIndex] = useState(chatTabIndex >= 0 ? chatTabIndex : 0)
   const activeTab = tabs[activeTabIndex]
   const isChatTab = activeTab && (activeTab.type === 'AI Chat' || activeTab.type === 'chat' || activeTab.type === 'ai-chat')
+  const isTldrTab = activeTab && activeTab.type === 'TLDR'
 
   // Widget open/close state
   const [widgetOpen, setWidgetOpen] = useState(false)
@@ -428,8 +429,89 @@ export function PreviewPage({ glance }: PreviewPageProps) {
               </div>
             )}
 
-            {/* Non-chat tab placeholder */}
-            {!isChatTab && (
+            {/* TLDR tab */}
+            {isTldrTab && (
+              <div className="widget-content tldr">
+                {/* Hero Banner */}
+                {(activeTab as any).tldr_banner_url ? (
+                  <div className="tabhero">
+                    <img src={(activeTab as any).tldr_banner_url} alt="" className="full-image" loading="lazy" />
+                  </div>
+                ) : (
+                  <div className="tabhero" style={{ background: '#e8e8e8', minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 13 }}>
+                    Banner Image
+                  </div>
+                )}
+                {/* Logo + Name Block */}
+                <div className="course-logo-block">
+                  <div className="logo-row">
+                    {(activeTab as any).tldr_logo_url ? (
+                      <div className="widget-logo">
+                        <img src={(activeTab as any).tldr_logo_url} alt="" className="full-image" loading="lazy" />
+                      </div>
+                    ) : (
+                      <div className="widget-logo" style={{ background: '#e8e8e8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 10 }}>
+                        Logo
+                      </div>
+                    )}
+                    <div className="widget-name-block">
+                      <div className="widget-name">{(activeTab as any).tldr_title || glance.name}</div>
+                      <div className="widget-subname">{(activeTab as any).tldr_subtitle || ''}</div>
+                    </div>
+                  </div>
+                  {/* Social Icons */}
+                  {((activeTab as any).tldr_socials ?? []).some((s: any) => s.url?.trim()) && (
+                    <div className="widget-social-row">
+                      {((activeTab as any).tldr_socials ?? []).filter((s: any) => s.url?.trim()).map((s: any, i: number) => (
+                        <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="widget-social-icons w-inline-block">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="social-ico">
+                            <circle cx="12" cy="12" r="10" />
+                          </svg>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Content Link Rows */}
+                {((activeTab as any).tldr_content_links ?? []).length > 0 && (
+                  <div className="content-rows">
+                    {((activeTab as any).tldr_content_links ?? []).filter((cl: any) => cl.title?.trim()).map((cl: any, i: number) => (
+                      <a
+                        key={i}
+                        href={cl.link || '#'}
+                        className="content-row-link w-inline-block"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          if (cl.tabLink) {
+                            const targetIndex = tabs.findIndex((t: any) =>
+                              `#glance-${t.name.toLowerCase().replace(/\s+/g, '-')}` === cl.tabLink
+                            )
+                            if (targetIndex >= 0) setActiveTabIndex(targetIndex)
+                          }
+                        }}
+                      >
+                        {cl.image_url ? (
+                          <div className="content-row-image">
+                            <img src={cl.image_url} alt="" className="full-image" loading="lazy" />
+                          </div>
+                        ) : (
+                          <div className="content-row-image" style={{ background: '#e8e8e8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 10 }}>
+                            IMG
+                          </div>
+                        )}
+                        <div className="content-row-block">
+                          <div className="content-row-header">{cl.title}</div>
+                          <div className="content-row-subheader">{cl.description || ''}</div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Non-chat, non-TLDR tab placeholder */}
+            {!isChatTab && !isTldrTab && (
               <div style={{ padding: 40, textAlign: 'center', color: '#999', fontSize: 14 }}>
                 <div>{activeTab?.name || 'Tab'}</div>
                 <div style={{ marginTop: 8, fontSize: 12 }}>({activeTab?.type || 'Widget'})</div>

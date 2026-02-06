@@ -2745,7 +2745,7 @@ em {
   color: #000;
   flex-flow: column;
   padding: 10px;
-  display: none;
+  display: flex;
   overflow: scroll;
 }
 
