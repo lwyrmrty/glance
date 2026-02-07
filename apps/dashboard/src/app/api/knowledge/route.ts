@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import * as cheerio from 'cheerio'
 
 // ============================================
 // HELPERS
@@ -146,6 +147,164 @@ async function fetchAirtableContent(baseId: string, tableId: string, apiKey: str
   }).join('\n\n')
 }
 
+/**
+ * Crawl a website: fetch root page, discover child links, fetch each child,
+ * extract clean text content, return combined content string.
+ */
+async function fetchWebsiteContent(rootUrl: string): Promise<string> {
+  const parsedRoot = new URL(rootUrl)
+  const origin = parsedRoot.origin
+
+  console.log(`[Glance] Crawling website: ${rootUrl}`)
+
+  // Step 1: Fetch the root page
+  const rootRes = await fetch(rootUrl, {
+    headers: { 'User-Agent': 'GlanceBot/1.0' },
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!rootRes.ok) {
+    throw new Error(`Failed to fetch root URL (${rootRes.status}): ${rootUrl}`)
+  }
+  const rootHtml = await rootRes.text()
+
+  // Step 2: Discover child page links on the same domain
+  const $root = cheerio.load(rootHtml)
+  const discoveredUrls = new Set<string>()
+
+  $root('a[href]').each((_, el) => {
+    const href = $root(el).attr('href')
+    if (!href) return
+    try {
+      const resolved = new URL(href, origin)
+      // Same origin, not the root page itself, not anchors/hashes
+      if (
+        resolved.origin === origin &&
+        resolved.pathname !== parsedRoot.pathname &&
+        !resolved.hash &&
+        !href.startsWith('#') &&
+        !href.startsWith('mailto:') &&
+        !href.startsWith('javascript:')
+      ) {
+        // Strip trailing slash for dedup
+        const clean = resolved.origin + resolved.pathname.replace(/\/$/, '')
+        discoveredUrls.add(clean)
+      }
+    } catch {
+      // Invalid URL — skip
+    }
+  })
+
+  const childUrls = Array.from(discoveredUrls)
+  console.log(`[Glance] Discovered ${childUrls.length} child pages from ${rootUrl}`)
+
+  // Step 3: Fetch each child page and extract text
+  const pages: { title: string; url: string; content: string }[] = []
+  const CONCURRENCY = 5
+  const DELAY_MS = 200
+
+  for (let i = 0; i < childUrls.length; i += CONCURRENCY) {
+    const batch = childUrls.slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(
+      batch.map(async (url) => {
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'GlanceBot/1.0' },
+          signal: AbortSignal.timeout(15000),
+        })
+        if (!res.ok) return null
+        const html = await res.text()
+        return { url, html }
+      })
+    )
+
+    for (const result of results) {
+      if (result.status !== 'fulfilled' || !result.value) continue
+      const { url, html } = result.value
+
+      const $ = cheerio.load(html)
+
+      // Remove non-content elements
+      $('script, style, nav, footer, header, noscript, iframe, svg, img').remove()
+      // Also remove common Webflow/marketing elements
+      $('[class*="navbar"], [class*="footer"], [class*="cookie"], [class*="popup"], [class*="modal"], [class*="banner"]').remove()
+
+      // Extract title
+      const title = $('h1').first().text().trim() ||
+                    $('title').first().text().trim().split(' — ')[0].split(' | ')[0] ||
+                    url.split('/').pop() || 'Untitled'
+
+      // Extract main content text
+      const bodyText = $('body').text()
+        .replace(/\s+/g, ' ')         // collapse whitespace
+        .replace(/ {2,}/g, ' ')        // collapse multiple spaces
+        .trim()
+
+      if (bodyText.length < 50) continue // Skip nearly empty pages
+
+      pages.push({ title, url, content: bodyText })
+    }
+
+    // Brief pause between batches
+    if (i + CONCURRENCY < childUrls.length) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_MS))
+    }
+    console.log(`[Glance] Fetched ${Math.min(i + CONCURRENCY, childUrls.length)}/${childUrls.length} pages`)
+  }
+
+  console.log(`[Glance] Extracted content from ${pages.length} pages`)
+
+  // Step 4: Combine all pages into a single content string
+  // Each page is separated and prefixed with title + URL for RAG context
+  const combined = pages.map(p =>
+    `Page: ${p.title}\nURL: ${p.url}\n\n${p.content}`
+  ).join('\n\n---\n\n')
+
+  return combined
+}
+
+/**
+ * Chunk website content per-page, preserving page context in every chunk.
+ * Each chunk is prefixed with the page title so the embedding knows
+ * what topic the chunk belongs to (e.g., "Robotic funds").
+ */
+function chunkWebsiteContent(content: string, targetTokens = 500, overlapTokens = 50): string[] {
+  // Split back into individual pages by our separator
+  const pageBlocks = content.split('\n\n---\n\n')
+  const allChunks: string[] = []
+
+  for (const block of pageBlocks) {
+    const trimmed = block.trim()
+    if (!trimmed) continue
+
+    // Extract the page header (title + URL)
+    const lines = trimmed.split('\n')
+    let pageHeader = ''
+    let pageContent = trimmed
+
+    if (lines[0]?.startsWith('Page: ')) {
+      const titleLine = lines[0]
+      const urlLine = lines[1]?.startsWith('URL: ') ? lines[1] : ''
+      pageHeader = [titleLine, urlLine].filter(Boolean).join('\n')
+      // Content starts after the header + blank line
+      const headerEnd = trimmed.indexOf('\n\n')
+      pageContent = headerEnd > 0 ? trimmed.slice(headerEnd + 2) : trimmed
+    }
+
+    // Chunk this page's content
+    const pageChunks = chunkProseText(pageContent, targetTokens, overlapTokens)
+
+    // Prefix each chunk with the page header so embeddings retain context
+    for (const chunk of pageChunks) {
+      if (pageHeader) {
+        allChunks.push(`${pageHeader}\n\n${chunk}`)
+      } else {
+        allChunks.push(chunk)
+      }
+    }
+  }
+
+  return allChunks
+}
+
 /** 
  * Chunk prose text into segments of approximately targetTokens size.
  * Uses ~4 chars per token as a rough estimate.
@@ -209,6 +368,9 @@ function chunkProseText(text: string, targetTokens = 500, overlapTokens = 50): s
  */
 function chunkTabularText(text: string, targetTokens = 500): { text: string; startRow: number; endRow: number }[] {
   const targetChars = targetTokens * 4
+  // Hard cap per chunk: stay safely under the embedding model's 8192 token limit
+  // Using very conservative ratio for data with URLs, numbers, special chars
+  const maxCharsPerChunk = 8000 // ~4000-6000 tokens depending on content
 
   // Split into individual row blocks (each starts with "Row N\n...")
   const rowBlocks = text.split(/\n\n/).filter(b => b.trim().length > 0)
@@ -218,11 +380,16 @@ function chunkTabularText(text: string, targetTokens = 500): { text: string; sta
   let chunkStartRow = 1
   let currentRow = 0
 
-  for (const block of rowBlocks) {
+  for (let block of rowBlocks) {
     // Extract row number from block
     const rowMatch = block.match(/^Row (\d+)/)
     const rowNum = rowMatch ? parseInt(rowMatch[1], 10) : currentRow + 1
     currentRow = rowNum
+
+    // Truncate oversized individual row blocks to stay under embedding limit
+    if (block.length > maxCharsPerChunk) {
+      block = block.slice(0, maxCharsPerChunk) + '\n[truncated]'
+    }
 
     if (currentChunk.length === 0) {
       chunkStartRow = rowNum
@@ -258,36 +425,104 @@ function isTabularType(type: string): boolean {
   return type === 'google_sheet' || type === 'airtable_table'
 }
 
-/** Generate embeddings for an array of text chunks using OpenAI */
+/** Generate embeddings for an array of text chunks using OpenAI (batched) */
 async function generateEmbeddings(chunks: string[]): Promise<number[][]> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not configured')
   }
 
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-small',
-      input: chunks,
-    }),
-  })
+  // Batch chunks to stay under the 300k token limit per request.
+  // Rough estimate: 1 token ≈ 4 chars. Use 250k token budget (~1M chars) per batch for safety.
+  const MAX_CHARS_PER_BATCH = 1_000_000
+  const batches: string[][] = []
+  let currentBatch: string[] = []
+  let currentBatchChars = 0
 
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`OpenAI embeddings API error (${response.status}): ${error}`)
+  for (const chunk of chunks) {
+    if (currentBatch.length > 0 && currentBatchChars + chunk.length > MAX_CHARS_PER_BATCH) {
+      batches.push(currentBatch)
+      currentBatch = []
+      currentBatchChars = 0
+    }
+    currentBatch.push(chunk)
+    currentBatchChars += chunk.length
+  }
+  if (currentBatch.length > 0) {
+    batches.push(currentBatch)
   }
 
-  const data = await response.json()
-  return data.data.map((item: { embedding: number[] }) => item.embedding)
+  console.log(`[Glance] Embedding ${chunks.length} chunks in ${batches.length} batch(es)`)
+
+  const allEmbeddings: number[][] = []
+
+  // Safety: truncate any individual chunk that exceeds the model's 8192 token context
+  const MAX_CHARS_PER_CHUNK = 8000 // conservative for dense-token content
+
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i].map(chunk =>
+      chunk.length > MAX_CHARS_PER_CHUNK ? chunk.slice(0, MAX_CHARS_PER_CHUNK) : chunk
+    )
+    console.log(`[Glance] Embedding batch ${i + 1}/${batches.length} (${batch.length} chunks)`)
+
+    // Retry with backoff for rate limits
+    let attempts = 0
+    const maxAttempts = 5
+    let response: Response | null = null
+
+    while (attempts < maxAttempts) {
+      response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: batch,
+        }),
+      })
+
+      if (response.status === 429) {
+        attempts++
+        const waitSec = Math.min(attempts * 5, 30) // 5s, 10s, 15s, 20s, 25s
+        console.log(`[Glance] Rate limited, waiting ${waitSec}s before retry ${attempts}/${maxAttempts}`)
+        await new Promise(resolve => setTimeout(resolve, waitSec * 1000))
+        continue
+      }
+      break
+    }
+
+    if (!response || !response.ok) {
+      const error = response ? await response.text() : 'No response'
+      throw new Error(`OpenAI embeddings API error (${response?.status}): ${error}`)
+    }
+
+    const data = await response.json()
+    const embeddings = data.data.map((item: { embedding: number[] }) => item.embedding)
+    allEmbeddings.push(...embeddings)
+
+    // Brief pause between batches to avoid hitting TPM rate limit
+    if (i < batches.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 3000))
+    }
+  }
+
+  return allEmbeddings
 }
 
 /** Derive a name from the first line of content */
-function deriveNameFromContent(content: string, type: string, meta?: { baseName?: string; tableName?: string }): string {
+function deriveNameFromContent(content: string, type: string, meta?: { baseName?: string; tableName?: string; url?: string }): string {
+  if (type === 'website') {
+    // Use the domain name as the source name
+    try {
+      const hostname = new URL(meta?.url || '').hostname.replace(/^www\./, '')
+      return hostname.slice(0, 100)
+    } catch {
+      return 'Website Crawl'
+    }
+  }
+
   if (type === 'airtable_table') {
     // Use base name + table name if available
     if (meta?.baseName && meta?.tableName) {
@@ -347,7 +582,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { type, shareLink, baseId, baseName, tableId, tableName, content: mdContent, fileName: mdFileName } = body
+    const { type, shareLink, baseId, baseName, tableId, tableName, content: mdContent, fileName: mdFileName, url: websiteUrl } = body
 
     // Validate based on type
     if (type === 'google_doc' || type === 'google_sheet') {
@@ -368,6 +603,13 @@ export async function POST(request: NextRequest) {
       if (!mdContent || typeof mdContent !== 'string' || !mdContent.trim()) {
         return NextResponse.json(
           { error: 'Missing required field: content (file content must be a non-empty string)' },
+          { status: 400 }
+        )
+      }
+    } else if (type === 'website') {
+      if (!websiteUrl || typeof websiteUrl !== 'string' || !websiteUrl.trim()) {
+        return NextResponse.json(
+          { error: 'Missing required field: url' },
           { status: 400 }
         )
       }
@@ -404,6 +646,8 @@ export async function POST(request: NextRequest) {
       config = { baseId, baseName, tableId, tableName }
     } else if (type === 'markdown') {
       config = { fileName: mdFileName || 'document.md' }
+    } else if (type === 'website') {
+      config = { url: websiteUrl.trim() }
     } else {
       return NextResponse.json(
         { error: `Source type "${type}" is not yet supported` },
@@ -456,6 +700,8 @@ export async function POST(request: NextRequest) {
         content = await fetchAirtableContent(baseId, tableId, account.airtable_api_key)
       } else if (type === 'markdown') {
         content = mdContent
+      } else if (type === 'website') {
+        content = await fetchWebsiteContent(websiteUrl.trim())
       } else {
         throw new Error(`Source type "${type}" is not supported`)
       }
@@ -465,7 +711,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Derive name from content
-      const name = deriveNameFromContent(content, type, { baseName, tableName })
+      const name = deriveNameFromContent(content, type, { baseName, tableName, url: websiteUrl })
 
       // Chunk the content — use row-aware chunking for tabular data
       let chunkRows: { source_id: string; content: string; metadata: Record<string, unknown>; embedding: string }[]
@@ -491,7 +737,7 @@ export async function POST(request: NextRequest) {
           embedding: JSON.stringify(embeddings[index]),
         }))
       } else {
-        const proseChunks = chunkProseText(content)
+        const proseChunks = type === 'website' ? chunkWebsiteContent(content) : chunkProseText(content)
         const embeddings = await generateEmbeddings(proseChunks)
         chunkCount = proseChunks.length
 
@@ -697,6 +943,11 @@ export async function PUT(request: NextRequest) {
         if (!content) {
           throw new Error('No stored content found for this markdown source')
         }
+      } else if (type === 'website') {
+        if (!typedConfig?.url) {
+          throw new Error('Source has no stored URL')
+        }
+        content = await fetchWebsiteContent(typedConfig.url)
       } else {
         throw new Error(`Re-sync not supported for type: ${type}`)
       }
@@ -708,6 +959,7 @@ export async function PUT(request: NextRequest) {
       const name = deriveNameFromContent(content, type, {
         baseName: typedConfig?.baseName,
         tableName: typedConfig?.tableName,
+        url: typedConfig?.url,
       })
 
       // Delete old chunks
@@ -740,7 +992,7 @@ export async function PUT(request: NextRequest) {
           embedding: JSON.stringify(embeddings[index]),
         }))
       } else {
-        const proseChunks = chunkProseText(content)
+        const proseChunks = type === 'website' ? chunkWebsiteContent(content) : chunkProseText(content)
         const embeddings = await generateEmbeddings(proseChunks)
         chunkCount = proseChunks.length
 

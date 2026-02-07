@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // CORS headers for cross-origin widget requests
@@ -18,12 +18,7 @@ export async function GET(
 ) {
   const { id } = await params
 
-  // Create an anonymous Supabase client (no cookie auth needed for public widget config)
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  )
+  const supabase = await createClient()
 
   const { data: widget, error } = await supabase
     .from('widgets')

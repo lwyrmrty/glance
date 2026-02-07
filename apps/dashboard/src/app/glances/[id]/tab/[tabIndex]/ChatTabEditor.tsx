@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useRef } from 'react'
 import { dragIconSvg, knowledgeTypeIcons, type TabHookProps, type TabHookResult, type KnowledgeSourceSummary } from './shared/icons'
+import { RichTextField } from '@/components/RichTextField'
 
 interface ChatTabHookProps extends TabHookProps {
   knowledgeSources: KnowledgeSourceSummary[]
@@ -30,10 +31,14 @@ export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const welcomeRef = useRef<HTMLTextAreaElement>(null)
   const failureRef = useRef<HTMLTextAreaElement>(null)
 
+  // Normalize HTML for change detection — strips tags so plain-text ↔ TipTap HTML
+  // comparisons don't trigger false "unsaved changes" on load
+  const stripHtml = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()
+
   // Change detection
   const hasChanges =
     welcomeMessage !== savedWelcome ||
-    directive !== savedDirective ||
+    (directive !== savedDirective && stripHtml(directive) !== stripHtml(savedDirective)) ||
     failureMessage !== savedFailureMessage ||
     JSON.stringify(suggestedPrompts) !== JSON.stringify(savedPrompts.length === 5 ? savedPrompts : ['', '', '', '', '']) ||
     JSON.stringify([...selectedKnowledgeSources].sort()) !== JSON.stringify([...savedKnowledgeSources].sort())
@@ -223,7 +228,13 @@ export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                 </div>
                 <div className="fieldexplainer">Instructions for how the chatbot should respond to users. Include key information like audience, purpose, and tone.</div>
                 <div>
-                  <textarea placeholder="" maxLength={5000} className="formfields message _333 w-input" value={directive} onChange={(e) => setDirective(e.target.value)}></textarea>
+                  <RichTextField
+                    value={directive}
+                    onChange={setDirective}
+                    placeholder="e.g. You are a helpful assistant that..."
+                    height={333}
+                    themeColor={themeColor}
+                  />
                 </div>
               </div>
               <div className="fieldblocks">

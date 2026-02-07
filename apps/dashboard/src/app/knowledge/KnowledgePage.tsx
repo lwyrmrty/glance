@@ -52,6 +52,7 @@ const sourceTypeIcons: Record<string, string> = {
   airtable_base: '/images/airtable.png',
   airtable_table: '/images/airtable.png',
   markdown: '/images/doc-icon.png',
+  website: 'globe',
   url: 'globe',
   text: 'globe',
 }
@@ -316,6 +317,7 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
     if ((selectedCreateType === 'google_doc' || selectedCreateType === 'google_sheet') && !shareLink.trim()) return
     if (selectedCreateType === 'airtable' && (!selectedBaseId || !selectedTableId)) return
     if (selectedCreateType === 'markdown' && !mdFileContent.trim()) return
+    if (selectedCreateType === 'website' && !shareLink.trim()) return
 
     setSyncing(true)
     try {
@@ -332,6 +334,8 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
       } else if (selectedCreateType === 'markdown') {
         bodyPayload.content = mdFileContent
         bodyPayload.fileName = mdFileName
+      } else if (selectedCreateType === 'website') {
+        bodyPayload.url = shareLink.trim()
       }
 
       const response = await fetch('/api/knowledge', {
@@ -630,6 +634,24 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                 </div>
                               )}
 
+                              {selectedSource.type === 'website' && (
+                                <div className="fieldblocks">
+                                  <div className="labelrow">
+                                    <div className="labeltext">Website URL</div>
+                                    <div className="labeldivider"></div>
+                                  </div>
+                                  <a
+                                    href={(selectedSource.config as { url?: string })?.url || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="formfields urlfield w-input"
+                                    style={{ display: 'block', textDecoration: 'none', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  >
+                                    {(selectedSource.config as { url?: string })?.url || ''}
+                                  </a>
+                                </div>
+                              )}
+
                               <div className="fieldblocks">
                                 <div className="labelrow">
                                   <div className="labeltext">Sync Status</div>
@@ -759,6 +781,22 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                           <div>
                             <div className="selectcard-heading">Markdown File</div>
                             <div className="selectcard-subheading">Upload a .md file to use as a knowledge source.</div>
+                          </div>
+                        </div>
+                      </a>
+
+                      <a
+                        href="#"
+                        className={`selectcard${selectedCreateType === 'website' ? ' selected' : ''} w-inline-block`}
+                        onClick={(e) => handleSelectCreateType(e, 'website')}
+                      >
+                        <div className="alignrow aligncenter">
+                          <div className="selectcard-icons">
+                            <GlobeIcon className="navicon full" />
+                          </div>
+                          <div>
+                            <div className="selectcard-heading">Website</div>
+                            <div className="selectcard-subheading">Crawl a website and its pages to use as knowledge.</div>
                           </div>
                         </div>
                       </a>
@@ -1128,6 +1166,70 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                           style={!mdFileContent.trim() ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
                         >
                           <div>Create &amp; Sync</div>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Create form — Website */}
+              {panelView === 'create-form' && selectedCreateType === 'website' && (
+                <div className="activecontent">
+                  <div className="contentblock">
+                    <div className="drawercontent-block _5">
+                      <div className="headeralign">
+                        <div className="tableimage" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <GlobeIcon className="navicon full" />
+                        </div>
+                        <div>
+                          <h2 className="sidedrawer-heading">Website</h2>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="drawercontent-block">
+                      <div className="formblock w-form">
+                        <form onSubmit={(e) => e.preventDefault()}>
+                          <div className="formcontent">
+                            <div className="fieldblocks">
+                              <div className="labelrow">
+                                <div className="labeltext">Website URL</div>
+                                <div className="labeldivider"></div>
+                              </div>
+                              <input
+                                className="formfields urlfield w-input"
+                                maxLength={512}
+                                name="website-url"
+                                placeholder="https://www.vcsheet.com/sheets"
+                                type="url"
+                                value={shareLink}
+                                onChange={(e) => setShareLink(e.target.value)}
+                                disabled={syncing}
+                              />
+                              <div className="fieldexplainer" style={{ marginTop: '6px' }}>
+                                All pages linked from this URL on the same domain will be crawled and indexed.
+                              </div>
+                            </div>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="stickysave-row">
+                    <div className="alignrow aligncenter _15">
+                      {syncing ? (
+                        <a href="#" className="buttonblock callout w-inline-block" style={{ opacity: 0.6, pointerEvents: 'none' }}>
+                          <div>Crawling...</div>
+                        </a>
+                      ) : (
+                        <a
+                          href="#"
+                          className={`buttonblock callout w-inline-block${!shareLink.trim() ? ' disabled' : ''}`}
+                          onClick={handleCreateAndSync}
+                          style={!shareLink.trim() ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+                        >
+                          <div>Crawl &amp; Sync</div>
                         </a>
                       )}
                     </div>

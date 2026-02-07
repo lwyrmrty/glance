@@ -578,30 +578,6 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                 <div className="formblock w-form">
                   <form>
                     <div className="formcontent">
-                      {/* Widget Icon */}
-                      <div className="fieldblocks">
-                        <div className="labelrow">
-                          <div className="labeltext">Widget Icon</div>
-                          <div className="labeldivider"></div>
-                        </div>
-                        <div className="selectbuttons-row">
-                          <label className="iconselector selected w-inline-block" style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden' }}>
-                            <img 
-                              src={widgetIconPreview} 
-                              loading="lazy" 
-                              alt="" 
-                              className="full-image" 
-                            />
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              onChange={handleWidgetIconUpload}
-                              style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-                            />
-                          </label>
-                        </div>
-                      </div>
-
                       {/* Suggested Prompts */}
                       <div className="fieldblocks">
                         <div className="labelrow">

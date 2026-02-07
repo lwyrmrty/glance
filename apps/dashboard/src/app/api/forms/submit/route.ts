@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // CORS headers — the widget submits from external sites
@@ -13,12 +13,7 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  // Anonymous Supabase client (no auth — public widget submissions)
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  )
+  const supabase = await createClient()
 
   try {
     const formData = await request.formData()
@@ -88,7 +83,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ---- Insert into form_submissions ----
+    // ---- Fire webhook BEFORE insert (flat Zapier-compatible payload) ----
+    let webhookStatus: number | null = null
+    if (webhookUrl) {
+      try {
+        // Build flat payload — form fields at top level with snake_case keys
+        const webhookPayload: Record<string, string> = {
+          event: 'form_submission',
+          form_name: formName,
+          widget_id: widgetId,
+          submitted_at: new Date().toISOString(),
+        }
+
+        for (const field of formFields) {
+          const key = field.label
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '')
+          webhookPayload[key] = data[field.label] ?? ''
+          // Add companion _url key for file fields
+          if (fileUrls[field.label]) {
+            webhookPayload[`${key}_url`] = fileUrls[field.label]
+          }
+        }
+
+        console.log('[Glance] Firing webhook to:', webhookUrl)
+        console.log('[Glance] Webhook payload:', JSON.stringify(webhookPayload))
+        const webhookRes = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+          signal: AbortSignal.timeout(10000), // 10s timeout
+        })
+        webhookStatus = webhookRes.status
+        const webhookBody = await webhookRes.text().catch(() => '')
+        console.log('[Glance] Webhook response status:', webhookStatus)
+        if (webhookStatus >= 400) {
+          console.log('[Glance] Webhook response body:', webhookBody)
+        }
+      } catch (err: any) {
+        console.error('[Glance] Webhook delivery error:', err?.message ?? err)
+        webhookStatus = 0
+      }
+    }
+
+    // ---- Insert into form_submissions (with webhook status included) ----
     const { error: insertError } = await supabase
       .from('form_submissions')
       .insert({
@@ -98,7 +137,7 @@ export async function POST(request: NextRequest) {
         data,
         file_urls: Object.keys(fileUrls).length > 0 ? fileUrls : {},
         webhook_url: webhookUrl || null,
-        webhook_status: null,
+        webhook_status: webhookStatus,
       })
 
     if (insertError) {
@@ -107,40 +146,6 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to save submission' },
         { status: 500, headers: corsHeaders }
       )
-    }
-
-    // ---- Fire webhook (async, non-blocking for the response) ----
-    let webhookStatus: number | null = null
-    if (webhookUrl) {
-      try {
-        const webhookPayload = {
-          widget_id: widgetId,
-          form_name: formName,
-          data,
-          file_urls: fileUrls,
-          submitted_at: new Date().toISOString(),
-        }
-        const webhookRes = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(webhookPayload),
-          signal: AbortSignal.timeout(10000), // 10s timeout
-        })
-        webhookStatus = webhookRes.status
-      } catch (err) {
-        console.error('[Glance] Webhook delivery error:', err)
-        webhookStatus = 0
-      }
-
-      // Update the submission with webhook status
-      // (best-effort — don't fail the response if this update fails)
-      await supabase
-        .from('form_submissions')
-        .update({ webhook_status: webhookStatus })
-        .eq('widget_id', widgetId)
-        .eq('form_name', formName)
-        .order('submitted_at', { ascending: false })
-        .limit(1)
     }
 
     return NextResponse.json(

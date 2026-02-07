@@ -108,6 +108,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
 
   // Form-specific controls (only used when isFormTab)
   const { formView, setFormView, loadSubmissions, submissions } = formTab as FormTabHookResult
+  const isSubmissionsView = isFormTab && formView === 'submissions'
 
   return (
     <div className="pagewrapper" style={{ '--vcs-purple': themeColor } as React.CSSProperties}>
@@ -191,8 +192,8 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
               {/* ===== Tab-specific editor sections ===== */}
               {activeTab.editorSections}
 
-              {/* ===== Tab Trigger (shared) ===== */}
-              <div className="contentblock">
+              {/* ===== Tab Trigger (shared) — hidden in submissions view ===== */}
+              {!isSubmissionsView && <div className="contentblock">
                 <div className="contenthead-row">
                   <h2 className="contenthead">Tab Trigger</h2>
                 </div>
@@ -262,8 +263,10 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
                 </div>
               </div>
 
-              {/* ===== Premium Content (shared) ===== */}
-              <div className="contentblock">
+}
+
+              {/* ===== Premium Content (shared) — hidden in submissions view ===== */}
+              {!isSubmissionsView && <div className="contentblock">
                 <div className="contenthead-row">
                   <h2 className="contenthead">Premium Content</h2>
                 </div>
@@ -302,8 +305,10 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
                 </div>
               </div>
 
-              {/* ===== Sticky Save (shared) ===== */}
-              <div className="stickysave-row">
+}
+
+              {/* ===== Sticky Save (shared) — hidden in submissions view ===== */}
+              {!isSubmissionsView && <div className="stickysave-row">
                 <div>
                   <button
                     type="button"
@@ -316,10 +321,11 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
                   </button>
                 </div>
               </div>
+}
             </div>
 
-            {/* ===== RIGHT SIDE: Demo Preview ===== */}
-            <div className="demoside downflex">
+            {/* ===== RIGHT SIDE: Demo Preview — hidden in submissions view ===== */}
+            {!isSubmissionsView && <div className="demoside downflex">
               <div className="_25-col center-fill-copy">
                 <div className="glancewidget">
                   <div className="glancewidget-tabs" style={{ position: 'relative' }}>
@@ -343,7 +349,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
                   </div>
                 </div>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
       </div>

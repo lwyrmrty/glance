@@ -11,6 +11,7 @@ export interface FormTabHookResult extends TabHookResult {
   setFormView: (v: 'settings' | 'submissions') => void
   loadSubmissions: (offset?: number) => Promise<void>
   submissions: any[]
+  submissionsTotal: number
 }
 
 export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving }: TabHookProps): FormTabHookResult {
@@ -47,6 +48,82 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [submissionsOffset, setSubmissionsOffset] = useState(0)
   const submissionsLimit = 20
+
+  // Bulk selection state for submissions
+  const [selectedSubIds, setSelectedSubIds] = useState<Set<string>>(new Set())
+  const [deletingSubmissions, setDeletingSubmissions] = useState(false)
+
+  const allSubsSelected = submissions.length > 0 && selectedSubIds.size === submissions.length
+  const someSubsSelected = selectedSubIds.size > 0
+
+  const toggleSelectAllSubs = () => {
+    if (allSubsSelected) {
+      setSelectedSubIds(new Set())
+    } else {
+      setSelectedSubIds(new Set(submissions.map((s: any) => s.id)))
+    }
+  }
+
+  const toggleSelectOneSub = (id: string) => {
+    setSelectedSubIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleBulkDeleteSubmissions = async () => {
+    if (selectedSubIds.size === 0) return
+    const count = selectedSubIds.size
+    if (!confirm(`Delete ${count} submission${count > 1 ? 's' : ''}? This cannot be undone.`)) return
+
+    setDeletingSubmissions(true)
+    try {
+      const res = await fetch('/api/forms/submissions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedSubIds) }),
+      })
+      if (res.ok) {
+        setSubmissions(prev => prev.filter((s: any) => !selectedSubIds.has(s.id)))
+        setSubmissionsTotal(prev => prev - count)
+        setSelectedSubIds(new Set())
+      }
+    } catch (e) {
+      console.error('Failed to delete submissions:', e)
+    }
+    setDeletingSubmissions(false)
+  }
+
+  const handleExportCsv = () => {
+    if (submissions.length === 0) return
+    const headers = ['Date', ...formFields.map(f => f.label), 'Webhook Status']
+    const rows = submissions.map((sub: any) => {
+      const date = new Date(sub.submitted_at).toLocaleString()
+      const fields = formFields.map(f => {
+        const fileUrl = sub.file_urls?.[f.label]
+        return fileUrl ? fileUrl : (sub.data?.[f.label] ?? '')
+      })
+      const webhook = sub.webhook_url
+        ? (sub.webhook_status >= 200 && sub.webhook_status < 300 ? String(sub.webhook_status) : 'Failed')
+        : ''
+      return [date, ...fields, webhook]
+    })
+
+    const escape = (val: string) => `"${String(val).replace(/"/g, '""')}"`
+    const csv = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${tabName.replace(/\s+/g, '-').toLowerCase()}-submissions.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   // Banner upload
   const bannerFileRef = useRef<File | null>(null)
@@ -375,97 +452,153 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
 
       {formView === 'submissions' && (
         <div className="contentblock">
-          <div className="contenthead-row">
-            <h2 className="contenthead">Submissions</h2>
-            <div style={{ marginLeft: 'auto', fontSize: 13, color: '#888' }}>
-              {submissionsTotal} total
-            </div>
-          </div>
           {submissionsLoading && submissions.length === 0 ? (
-            <div style={{ padding: '40px 0', textAlign: 'center', color: '#888', fontSize: 14 }}>
-              Loading submissions...
+            <div className="emptycard" style={{ display: 'flex' }}>
+              <div className="emptystate-content">
+                <div className="emptystate-subheading">Loading submissions...</div>
+              </div>
             </div>
           ) : submissions.length === 0 ? (
-            <div style={{ padding: '40px 0', textAlign: 'center', color: '#888', fontSize: 14 }}>
-              No submissions yet. Submissions will appear here when users fill out this form.
+            <div className="emptycard" style={{ display: 'flex' }}>
+              <div className="emptystate-content">
+                <div>
+                  <div className="emptystate-heading">No submissions yet</div>
+                  <div className="emptystate-subheading">Submissions will appear here when users fill out this form.</div>
+                </div>
+              </div>
             </div>
           ) : (
-            <>
-              <div style={{ overflowX: 'auto' }}>
+            <div className="nonempty">
+              {/* Table Header */}
+              <div className="tablerow header">
+                <div className="tablerow-left">
+                  <div className="tableblock">
+                    <div className="checkboxwrapper" onClick={toggleSelectAllSubs} style={{ cursor: 'pointer' }}>
+                      <div className={`checkboxelement${allSubsSelected ? ' checked' : ''}`}></div>
+                    </div>
+                    <div className="bulkactions-row">
+                      <a
+                        href="#"
+                        className={`bulkaction-button delete w-inline-block${!someSubsSelected ? ' disabled' : ''}`}
+                        onClick={(e) => { e.preventDefault(); handleBulkDeleteSubmissions() }}
+                        style={!someSubsSelected || deletingSubmissions ? { opacity: 0.4, pointerEvents: 'none' } : {}}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="actionicon">
+                          <path d="M14.5 18C15.3284 18 16 17.3284 16 16.5V10.5C16 9.67158 15.3284 9 14.5 9C13.6716 9 13 9.67158 13 10.5V16.5C13 17.3284 13.6716 18 14.5 18Z" fill="currentColor"></path>
+                          <path d="M9.5 18C10.3284 18 11 17.3284 11 16.5V10.5C11 9.67158 10.3284 9 9.5 9C8.67158 9 8 9.67158 8 10.5V16.5C8 17.3284 8.67158 18 9.5 18Z" fill="currentColor"></path>
+                          <path d="M23 4.5C23 3.67158 22.3285 3 21.5 3H17.724C17.0921 1.20736 15.4007 0.00609375 13.5 0H10.5C8.59928 0.00609375 6.90789 1.20736 6.27602 3H2.5C1.67158 3 1 3.67158 1 4.5C1 5.32842 1.67158 6 2.5 6H3.00002V18.5C3.00002 21.5376 5.46245 24 8.5 24H15.5C18.5376 24 21 21.5376 21 18.5V6H21.5C22.3285 6 23 5.32842 23 4.5ZM18 18.5C18 19.8807 16.8807 21 15.5 21H8.5C7.1193 21 6.00002 19.8807 6.00002 18.5V6H18V18.5Z" fill="currentColor"></path>
+                        </svg>
+                        <div>{deletingSubmissions ? 'Deleting...' : 'Delete'}</div>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                <div className="tablerow-right">
+                  <div className="tableblock right nopadding">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontSize: 13, color: '#888' }}>{submissionsTotal} total</div>
+                      <a href="#" className="bulkaction-button w-inline-block" onClick={(e) => { e.preventDefault(); handleExportCsv() }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="actionicon">
+                          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
+                          <path d="M7 10L12 15L17 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
+                          <path d="M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
+                        </svg>
+                        <div>Export CSV</div>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Column Table */}
+              <div className="tablewrapper" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--admin-border, #333)' }}>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#aaa', whiteSpace: 'nowrap' }}>Date</th>
+                    <tr>
+                      <th style={{ padding: '12px 12px 12px 0', textAlign: 'left', fontWeight: 500, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', whiteSpace: 'nowrap', width: 32 }}></th>
+                      <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 500, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', whiteSpace: 'nowrap' }}>Date</th>
                       {formFields.map((f, fi) => (
-                        <th key={fi} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#aaa', whiteSpace: 'nowrap' }}>{f.label}</th>
+                        <th key={fi} style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 500, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', whiteSpace: 'nowrap' }}>{f.label}</th>
                       ))}
-                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#aaa', whiteSpace: 'nowrap' }}>Webhook</th>
+                      <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: 500, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888', whiteSpace: 'nowrap' }}>Webhook</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {submissions.map((sub) => (
-                      <tr key={sub.id} style={{ borderBottom: '1px solid var(--admin-border, #222)' }}>
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', color: '#ccc' }}>
-                          {new Date(sub.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
-                          <span style={{ color: '#777' }}>{new Date(sub.submitted_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
-                        </td>
-                        {formFields.map((f, fi) => {
-                          const val = sub.data?.[f.label] ?? ''
-                          const isFileUrl = sub.file_urls?.[f.label]
-                          return (
-                            <td key={fi} style={{ padding: '10px 12px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {isFileUrl ? (
-                                <a href={isFileUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--vcs-purple, #6c5ce7)', textDecoration: 'underline' }}>
-                                  {String(val).split('/').pop() || 'Download'}
-                                </a>
-                              ) : (
-                                <span style={{ color: '#ddd' }}>{val || '—'}</span>
-                              )}
-                            </td>
-                          )
-                        })}
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                          {sub.webhook_url ? (
-                            sub.webhook_status >= 200 && sub.webhook_status < 300 ? (
-                              <span style={{ color: '#2ecc71' }}>{sub.webhook_status}</span>
-                            ) : (
-                              <span style={{ color: '#e74c3c' }}>{sub.webhook_status || 'Failed'}</span>
+                    {submissions.map((sub: any) => {
+                      const isSelected = selectedSubIds.has(sub.id)
+                      return (
+                        <tr key={sub.id} className={isSelected ? 'selectedrow' : ''} style={{ borderTop: '1px solid var(--admin-border, rgba(255,255,255,0.06))' }}>
+                          <td style={{ padding: '12px 12px 12px 0', verticalAlign: 'middle', width: 32 }}>
+                            <div className="checkboxwrapper" onClick={(e) => { e.stopPropagation(); toggleSelectOneSub(sub.id) }} style={{ cursor: 'pointer' }}>
+                              <div className={`checkboxelement${isSelected ? ' checked' : ''}`}></div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                            <div className="tablename" style={{ fontSize: 13 }}>
+                              {new Date(sub.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </div>
+                            <div className="tablesublabel" style={{ fontSize: 11 }}>
+                              {new Date(sub.submitted_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            </div>
+                          </td>
+                          {formFields.map((f, fi) => {
+                            const val = sub.data?.[f.label] ?? ''
+                            const fileUrl = sub.file_urls?.[f.label]
+                            return (
+                              <td key={fi} style={{ padding: '12px 12px', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                {fileUrl ? (
+                                  <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--vcs-purple, #6c5ce7)', textDecoration: 'underline', fontSize: 13 }}>
+                                    {val || 'Download'}
+                                  </a>
+                                ) : (
+                                  <span style={{ color: '#ccc', fontSize: 13 }}>{val || '—'}</span>
+                                )}
+                              </td>
                             )
-                          ) : (
-                            <span style={{ color: '#555' }}>—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                          })}
+                          <td style={{ padding: '12px 12px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                            {sub.webhook_url ? (
+                              sub.webhook_status >= 200 && sub.webhook_status < 300 ? (
+                                <span style={{ color: '#2ecc71', fontSize: 13 }}>{sub.webhook_status}</span>
+                              ) : (
+                                <span style={{ color: '#e74c3c', fontSize: 13 }}>{sub.webhook_status || 'Failed'}</span>
+                              )
+                            ) : (
+                              <span style={{ color: '#555', fontSize: 13 }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
               {submissionsTotal > submissionsLimit && (
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, padding: '16px 0' }}>
-                  <button
-                    type="button"
-                    disabled={submissionsOffset === 0 || submissionsLoading}
-                    onClick={() => loadSubmissions(Math.max(0, submissionsOffset - submissionsLimit))}
-                    className="buttonblock w-inline-block"
-                    style={{ border: 'none', cursor: submissionsOffset === 0 ? 'default' : 'pointer', opacity: submissionsOffset === 0 ? 0.4 : 1, fontSize: 13, padding: '8px 16px' }}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, padding: '16px 0' }}>
+                  <a
+                    href="#"
+                    className="bulkaction-button w-inline-block"
+                    onClick={(e) => { e.preventDefault(); if (submissionsOffset > 0) loadSubmissions(Math.max(0, submissionsOffset - submissionsLimit)) }}
+                    style={submissionsOffset === 0 || submissionsLoading ? { opacity: 0.4, pointerEvents: 'none' } : {}}
                   >
-                    Previous
-                  </button>
-                  <span style={{ color: '#888', fontSize: 13, lineHeight: '34px' }}>
+                    <div>Previous</div>
+                  </a>
+                  <span style={{ color: '#888', fontSize: 13 }}>
                     {submissionsOffset + 1}–{Math.min(submissionsOffset + submissionsLimit, submissionsTotal)} of {submissionsTotal}
                   </span>
-                  <button
-                    type="button"
-                    disabled={submissionsOffset + submissionsLimit >= submissionsTotal || submissionsLoading}
-                    onClick={() => loadSubmissions(submissionsOffset + submissionsLimit)}
-                    className="buttonblock w-inline-block"
-                    style={{ border: 'none', cursor: submissionsOffset + submissionsLimit >= submissionsTotal ? 'default' : 'pointer', opacity: submissionsOffset + submissionsLimit >= submissionsTotal ? 0.4 : 1, fontSize: 13, padding: '8px 16px' }}
+                  <a
+                    href="#"
+                    className="bulkaction-button w-inline-block"
+                    onClick={(e) => { e.preventDefault(); if (submissionsOffset + submissionsLimit < submissionsTotal) loadSubmissions(submissionsOffset + submissionsLimit) }}
+                    style={submissionsOffset + submissionsLimit >= submissionsTotal || submissionsLoading ? { opacity: 0.4, pointerEvents: 'none' } : {}}
                   >
-                    Next
-                  </button>
+                    <div>Next</div>
+                  </a>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       )}
@@ -537,5 +670,5 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     </div>
   )
 
-  return { editorSections, preview, hasChanges, handleSave, formView, setFormView, loadSubmissions, submissions }
+  return { editorSections, preview, hasChanges, handleSave, formView, setFormView, loadSubmissions, submissions, submissionsTotal }
 }
