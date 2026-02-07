@@ -6,6 +6,15 @@ import * as cheerio from 'cheerio'
 // HELPERS
 // ============================================
 
+/** Strip null bytes, control characters, and lone surrogates that break PostgreSQL jsonb */
+function sanitizeForDb(text: string): string {
+  return text
+    .replace(/\0/g, '')                           // null bytes
+    .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '') // control chars (keep \t \n \r)
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '') // lone high surrogates
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '') // lone low surrogates
+}
+
 /** Extract Google Doc ID from a share link */
 function extractGoogleDocId(url: string): string | null {
   const match = url.match(/\/document\/d\/([a-zA-Z0-9_-]+)/)
@@ -92,15 +101,22 @@ function csvToReadableText(csv: string): string {
   }).join('\n\n')
 }
 
-/** Fetch all records from an Airtable table and convert to readable text */
-async function fetchAirtableContent(baseId: string, tableId: string, apiKey: string): Promise<string> {
+/** Fetch all records from an Airtable table (optionally filtered by view and fields) and convert to readable text */
+async function fetchAirtableContent(baseId: string, tableId: string, apiKey: string, viewId?: string, selectedFields?: string[]): Promise<string> {
   const allRecords: Record<string, unknown>[] = []
   let offset: string | undefined
 
   // Paginate through all records
   do {
     const url = new URL(`https://api.airtable.com/v0/${baseId}/${tableId}`)
+    if (viewId) url.searchParams.set('view', viewId)
     if (offset) url.searchParams.set('offset', offset)
+    // Only fetch selected fields if specified — reduces noise and chunk size
+    if (selectedFields && selectedFields.length > 0) {
+      for (const field of selectedFields) {
+        url.searchParams.append('fields[]', field)
+      }
+    }
 
     const response = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -121,8 +137,8 @@ async function fetchAirtableContent(baseId: string, tableId: string, apiKey: str
     throw new Error('Airtable table appears to be empty')
   }
 
-  // Convert records into a readable text format similar to Google Sheets
-  // Collect all field names across records
+  // Convert records into a readable text format optimized for RAG
+  // Collect all field names across records (preserving insertion order)
   const fieldNames = new Set<string>()
   for (const record of allRecords) {
     const fields = (record as { fields: Record<string, unknown> }).fields || {}
@@ -132,19 +148,65 @@ async function fetchAirtableContent(baseId: string, tableId: string, apiKey: str
   }
   const headers = Array.from(fieldNames)
 
-  return allRecords.map((record, i) => {
+  // Use the first field as the primary identifier (Airtable's primary field is always first)
+  const primaryField = headers[0] || null
+
+  // Build a schema header that will be prepended to every chunk
+  const schemaLine = `[Schema: ${headers.join(' | ')}]`
+
+  const rows = allRecords.map((record, i) => {
     const fields = (record as { fields: Record<string, unknown> }).fields || {}
+
+    // Determine record label from primary field or fall back to row number
+    const primaryValue = primaryField ? formatAirtableValue(fields[primaryField]) : null
+    const recordLabel = primaryValue ? `Record: ${primaryValue}` : `Row ${i + 1}`
+
     const pairs = headers
       .map(header => {
         const value = fields[header]
         if (value === null || value === undefined || value === '') return null
-        // Handle arrays (linked records, attachments, etc.)
-        const displayValue = Array.isArray(value) ? value.join(', ') : String(value)
-        return `${header}: ${displayValue}`
+        return `${header}: ${formatAirtableValue(value)}`
       })
       .filter(Boolean)
-    return `Row ${i + 1}\n${pairs.join('\n')}`
-  }).join('\n\n')
+    return `${recordLabel}\n${pairs.join('\n')}`
+  })
+
+  // Prepend schema line to the full content — chunkTabularText will see it
+  // and we'll also inject it per-chunk later
+  return `${schemaLine}\n\n${rows.join('\n\n')}`
+}
+
+/** Format an Airtable field value into a clean readable string */
+function formatAirtableValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+
+  // Arrays: linked records, multi-select, attachments
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (typeof item === 'string') return item
+      // Attachment objects have a `url` and optional `filename`
+      if (item && typeof item === 'object') {
+        const obj = item as Record<string, unknown>
+        if (obj.url && obj.filename) return `${obj.filename} (${obj.url})`
+        if (obj.url) return String(obj.url)
+        if (obj.name) return String(obj.name)
+        // Linked record expanded — try common fields
+        if (obj.id && typeof obj.id === 'string') return String(obj.name || obj.id)
+        return JSON.stringify(obj)
+      }
+      return String(item)
+    }).join(', ')
+  }
+
+  // Objects (rare but possible — e.g., collaborator fields)
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    if (obj.name) return String(obj.name)
+    if (obj.email) return String(obj.email)
+    return JSON.stringify(obj)
+  }
+
+  return String(value)
 }
 
 /**
@@ -232,6 +294,28 @@ async function fetchWebsiteContent(rootUrl: string): Promise<string> {
                     $('title').first().text().trim().split(' — ')[0].split(' | ')[0] ||
                     url.split('/').pop() || 'Untitled'
 
+      // Preserve link URLs as markdown before text extraction
+      // This ensures profile links, page URLs, etc. survive the .text() call
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href')
+        const text = $(el).text().trim()
+        if (href && text && text !== 'Profile' && text !== 'Website') {
+          // Resolve relative URLs to absolute
+          let fullUrl = href
+          try {
+            fullUrl = new URL(href, url).href
+          } catch { /* keep as-is */ }
+          $(el).replaceWith(` [${text}](${fullUrl}) `)
+        } else if (href && (text === 'Profile' || text === 'Website')) {
+          // For "Profile" and "Website" links, include the URL explicitly
+          let fullUrl = href
+          try {
+            fullUrl = new URL(href, url).href
+          } catch { /* keep as-is */ }
+          $(el).replaceWith(` ${text}: ${fullUrl} `)
+        }
+      })
+
       // Insert separators between block-level and table elements so text
       // extraction doesn't mash everything together (e.g., table cells)
       $('tr').each((_, el) => { $(el).append('\n') })
@@ -240,6 +324,8 @@ async function fetchWebsiteContent(rootUrl: string): Promise<string> {
 
       // Extract main content text
       const bodyText = $('body').text()
+        .replace(/\0/g, '')            // strip null bytes (breaks PostgreSQL jsonb)
+        .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '') // strip other control chars (keep \t \n \r)
         .replace(/[ \t]+/g, ' ')       // collapse horizontal whitespace (keep newlines)
         .replace(/ *\n */g, '\n')      // clean up spaces around newlines
         .replace(/\n{3,}/g, '\n\n')    // max 2 consecutive newlines
@@ -367,44 +453,64 @@ function chunkProseText(text: string, targetTokens = 500, overlapTokens = 50): s
 }
 
 /**
- * Chunk tabular text (Google Sheets / Airtable) on row boundaries.
- * Each "row" block starts with "Row N\n" and is separated by \n\n.
- * Rows are never split across chunks — we pack as many full rows
+ * Chunk tabular text (Google Sheets / Airtable) on row/record boundaries.
+ * Each block starts with "Row N\n" or "Record: Name\n" and is separated by \n\n.
+ * Records are never split across chunks — we pack as many full records
  * as will fit within the target token budget.
+ * If the text starts with a [Schema: ...] line, it's extracted and prepended
+ * to every chunk so each chunk is self-describing.
  * Returns { text, startRow, endRow }[] for rich metadata.
  */
 function chunkTabularText(text: string, targetTokens = 500): { text: string; startRow: number; endRow: number }[] {
   const targetChars = targetTokens * 4
   // Hard cap per chunk: stay safely under the embedding model's 8192 token limit
-  // Using very conservative ratio for data with URLs, numbers, special chars
-  const maxCharsPerChunk = 8000 // ~4000-6000 tokens depending on content
+  // Structured data (field names, URLs, numbers) tokenizes at ~1.5-2 chars per token,
+  // so 4000 chars ≈ 2000-2700 tokens — well under the 8192 limit with safety margin
+  const maxCharsPerChunk = 4000
 
-  // Split into individual row blocks (each starts with "Row N\n...")
-  const rowBlocks = text.split(/\n\n/).filter(b => b.trim().length > 0)
+  // Extract schema header if present — will be prepended to every chunk
+  let schemaHeader = ''
+  let bodyText = text
+  const schemaMatch = text.match(/^\[Schema: [^\]]+\]\n\n/)
+  if (schemaMatch) {
+    schemaHeader = schemaMatch[0].trim()
+    bodyText = text.slice(schemaMatch[0].length)
+  }
+
+  // Split into individual row/record blocks
+  const rowBlocks = bodyText.split(/\n\n/).filter(b => b.trim().length > 0)
 
   const chunks: { text: string; startRow: number; endRow: number }[] = []
   let currentChunk = ''
   let chunkStartRow = 1
   let currentRow = 0
 
+  // Account for schema header size in chunk budget
+  const schemaOverhead = schemaHeader ? schemaHeader.length + 2 : 0 // +2 for \n\n
+  const effectiveTarget = targetChars - schemaOverhead
+  const effectiveMax = maxCharsPerChunk - schemaOverhead
+
   for (let block of rowBlocks) {
-    // Extract row number from block
+    // Extract row number from "Row N" or treat "Record: ..." blocks sequentially
     const rowMatch = block.match(/^Row (\d+)/)
     const rowNum = rowMatch ? parseInt(rowMatch[1], 10) : currentRow + 1
     currentRow = rowNum
 
     // Truncate oversized individual row blocks to stay under embedding limit
-    if (block.length > maxCharsPerChunk) {
-      block = block.slice(0, maxCharsPerChunk) + '\n[truncated]'
+    if (block.length > effectiveMax) {
+      block = block.slice(0, effectiveMax) + '\n[truncated]'
     }
 
     if (currentChunk.length === 0) {
       chunkStartRow = rowNum
       currentChunk = block
-    } else if (currentChunk.length + block.length + 2 > targetChars) {
-      // Current chunk is full — push it and start a new one
+    } else if (currentChunk.length + block.length + 2 > effectiveTarget) {
+      // Current chunk is full — prepend schema and push
+      const chunkText = schemaHeader
+        ? `${schemaHeader}\n\n${currentChunk.trim()}`
+        : currentChunk.trim()
       chunks.push({
-        text: currentChunk.trim(),
+        text: chunkText,
         startRow: chunkStartRow,
         endRow: rowNum - 1,
       })
@@ -415,10 +521,13 @@ function chunkTabularText(text: string, targetTokens = 500): { text: string; sta
     }
   }
 
-  // Don't forget the last chunk
+  // Don't forget the last chunk — also prepend schema
   if (currentChunk.trim().length > 0) {
+    const chunkText = schemaHeader
+      ? `${schemaHeader}\n\n${currentChunk.trim()}`
+      : currentChunk.trim()
     chunks.push({
-      text: currentChunk.trim(),
+      text: chunkText,
       startRow: chunkStartRow,
       endRow: currentRow,
     })
@@ -464,7 +573,8 @@ async function generateEmbeddings(chunks: string[]): Promise<number[][]> {
   const allEmbeddings: number[][] = []
 
   // Safety: truncate any individual chunk that exceeds the model's 8192 token context
-  const MAX_CHARS_PER_CHUNK = 8000 // conservative for dense-token content
+  // Structured/tabular data tokenizes at ~1.5-2 chars per token, so 4000 chars is ~2700 tokens max
+  const MAX_CHARS_PER_CHUNK = 4000
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i].map(chunk =>
@@ -516,6 +626,56 @@ async function generateEmbeddings(chunks: string[]): Promise<number[][]> {
   }
 
   return allEmbeddings
+}
+
+/** Insert chunk rows into the database with batch + fallback to individual inserts */
+async function insertChunkRows(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  chunkRows: { source_id: string; content: string; metadata: Record<string, unknown>; embedding: string }[]
+): Promise<{ inserted: number; skipped: number }> {
+  let inserted = 0
+  let skipped = 0
+  const BATCH_SIZE = 50
+
+  for (let b = 0; b < chunkRows.length; b += BATCH_SIZE) {
+    const batch = chunkRows.slice(b, b + BATCH_SIZE)
+
+    const { error: batchError } = await supabase
+      .from('knowledge_chunks')
+      .insert(batch)
+
+    if (!batchError) {
+      inserted += batch.length
+      continue
+    }
+
+    // Batch failed — fall back to inserting one at a time to skip bad rows
+    console.warn(`[Glance] Batch ${Math.floor(b / BATCH_SIZE) + 1} failed: ${batchError.message}. Falling back to individual inserts.`)
+
+    for (let j = 0; j < batch.length; j++) {
+      const row = batch[j]
+      const { error: rowError } = await supabase
+        .from('knowledge_chunks')
+        .insert(row)
+
+      if (rowError) {
+        skipped++
+        console.warn(`[Glance] Skipped chunk ${b + j} (${row.metadata?.sourceName || 'unknown'}): ${rowError.message}`)
+        // Log a preview of the problematic data
+        console.warn(`[Glance]   content length: ${row.content.length}, first 200 chars: ${JSON.stringify(row.content.slice(0, 200))}`)
+        console.warn(`[Glance]   metadata: ${JSON.stringify(row.metadata)}`)
+        console.warn(`[Glance]   embedding length: ${row.embedding.length}, first 50 chars: ${row.embedding.slice(0, 50)}`)
+      } else {
+        inserted++
+      }
+    }
+  }
+
+  if (skipped > 0) {
+    console.warn(`[Glance] Inserted ${inserted} chunks, skipped ${skipped} problematic chunks`)
+  }
+
+  return { inserted, skipped }
 }
 
 /** Derive a name from the first line of content */
@@ -589,7 +749,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { type, shareLink, baseId, baseName, tableId, tableName, content: mdContent, fileName: mdFileName, url: websiteUrl } = body
+    const { type, shareLink, baseId, baseName, tableId, tableName, viewId, viewName, content: mdContent, fileName: mdFileName, url: websiteUrl, comments: sourceComments } = body
 
     // Validate based on type
     if (type === 'google_doc' || type === 'google_sheet') {
@@ -650,7 +810,7 @@ export async function POST(request: NextRequest) {
       }
       config = { shareLink, resourceId }
     } else if (type === 'airtable_table') {
-      config = { baseId, baseName, tableId, tableName }
+      config = { baseId, baseName, tableId, tableName, viewId, viewName, selectedFields: body.selectedFields }
     } else if (type === 'markdown') {
       config = { fileName: mdFileName || 'document.md' }
     } else if (type === 'website') {
@@ -663,15 +823,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the knowledge source record (syncing state)
+    const insertPayload: Record<string, unknown> = {
+      account_id: membership.account_id,
+      name: 'Syncing...',
+      type,
+      config,
+      sync_status: 'syncing',
+    }
+    if (sourceComments && sourceComments.replace(/<[^>]+>/g, '').trim()) {
+      insertPayload.comments = sourceComments
+    }
     const { data: source, error: insertError } = await supabase
       .from('knowledge_sources')
-      .insert({
-        account_id: membership.account_id,
-        name: 'Syncing...',
-        type,
-        config,
-        sync_status: 'syncing',
-      })
+      .insert(insertPayload)
       .select()
       .single()
 
@@ -704,7 +868,7 @@ export async function POST(request: NextRequest) {
           throw new Error('Airtable is not connected. Add your API key in Integrations.')
         }
 
-        content = await fetchAirtableContent(baseId, tableId, account.airtable_api_key)
+        content = await fetchAirtableContent(baseId, tableId, account.airtable_api_key, viewId, body.selectedFields)
       } else if (type === 'markdown') {
         content = mdContent
       } else if (type === 'website') {
@@ -729,17 +893,22 @@ export async function POST(request: NextRequest) {
         const embeddings = await generateEmbeddings(tabularChunks.map(c => c.text))
         chunkCount = tabularChunks.length
 
+        // Extract schema fields from content for metadata
+        const schemaFieldsMatch = content.match(/^\[Schema: ([^\]]+)\]/)
+        const schemaFields = schemaFieldsMatch ? schemaFieldsMatch[1].split(' | ') : undefined
+
         chunkRows = tabularChunks.map((chunk, index) => ({
           source_id: source.id,
-          content: chunk.text,
+          content: sanitizeForDb(chunk.text),
           metadata: {
             chunkIndex: index,
             totalChunks: tabularChunks.length,
-            sourceName: name,
+            sourceName: sanitizeForDb(name),
             sourceType: type,
             rowRange: `rows ${chunk.startRow}–${chunk.endRow}`,
             startRow: chunk.startRow,
             endRow: chunk.endRow,
+            ...(schemaFields ? { fields: schemaFields } : {}),
           },
           embedding: JSON.stringify(embeddings[index]),
         }))
@@ -750,24 +919,20 @@ export async function POST(request: NextRequest) {
 
         chunkRows = proseChunks.map((chunkContent, index) => ({
           source_id: source.id,
-          content: chunkContent,
+          content: sanitizeForDb(chunkContent),
           metadata: {
             chunkIndex: index,
             totalChunks: proseChunks.length,
-            sourceName: name,
+            sourceName: sanitizeForDb(name),
             sourceType: type,
           },
           embedding: JSON.stringify(embeddings[index]),
         }))
       }
 
-      const { error: chunksError } = await supabase
-        .from('knowledge_chunks')
-        .insert(chunkRows)
-
-      if (chunksError) {
-        throw new Error(`Failed to insert chunks: ${chunksError.message}`)
-      }
+      const { inserted, skipped } = await insertChunkRows(supabase, chunkRows)
+      console.log(`[Glance] Insert complete: ${inserted} inserted, ${skipped} skipped out of ${chunkRows.length}`)
+      chunkCount = inserted
 
       // Update source with synced status
       const { data: updatedSource, error: updateError } = await supabase
@@ -943,7 +1108,7 @@ export async function PUT(request: NextRequest) {
           throw new Error('Airtable is not connected. Add your API key in Integrations.')
         }
 
-        content = await fetchAirtableContent(typedConfig.baseId, typedConfig.tableId, account.airtable_api_key)
+        content = await fetchAirtableContent(typedConfig.baseId, typedConfig.tableId, account.airtable_api_key, typedConfig.viewId, typedConfig.selectedFields)
       } else if (type === 'markdown') {
         // Markdown content is stored directly — re-chunk from stored content
         content = source.content
@@ -984,17 +1149,22 @@ export async function PUT(request: NextRequest) {
         const embeddings = await generateEmbeddings(tabularChunks.map(c => c.text))
         chunkCount = tabularChunks.length
 
+        // Extract schema fields from content for metadata
+        const schemaFieldsMatch = content.match(/^\[Schema: ([^\]]+)\]/)
+        const schemaFields = schemaFieldsMatch ? schemaFieldsMatch[1].split(' | ') : undefined
+
         chunkRows = tabularChunks.map((chunk, index) => ({
           source_id: id,
-          content: chunk.text,
+          content: sanitizeForDb(chunk.text),
           metadata: {
             chunkIndex: index,
             totalChunks: tabularChunks.length,
-            sourceName: name,
+            sourceName: sanitizeForDb(name),
             sourceType: type,
             rowRange: `rows ${chunk.startRow}–${chunk.endRow}`,
             startRow: chunk.startRow,
             endRow: chunk.endRow,
+            ...(schemaFields ? { fields: schemaFields } : {}),
           },
           embedding: JSON.stringify(embeddings[index]),
         }))
@@ -1005,24 +1175,20 @@ export async function PUT(request: NextRequest) {
 
         chunkRows = proseChunks.map((chunkContent, index) => ({
           source_id: id,
-          content: chunkContent,
+          content: sanitizeForDb(chunkContent),
           metadata: {
             chunkIndex: index,
             totalChunks: proseChunks.length,
-            sourceName: name,
+            sourceName: sanitizeForDb(name),
             sourceType: type,
           },
           embedding: JSON.stringify(embeddings[index]),
         }))
       }
 
-      const { error: chunksError } = await supabase
-        .from('knowledge_chunks')
-        .insert(chunkRows)
-
-      if (chunksError) {
-        throw new Error(`Failed to insert chunks: ${chunksError.message}`)
-      }
+      const { inserted, skipped } = await insertChunkRows(supabase, chunkRows)
+      console.log(`[Glance] Re-sync insert complete: ${inserted} inserted, ${skipped} skipped out of ${chunkRows.length}`)
+      chunkCount = inserted
 
       // Update source
       const resyncPayload: Record<string, unknown> = {
@@ -1083,7 +1249,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name } = body
+    const { id, name, comments } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Missing source id' }, { status: 400 })
@@ -1091,6 +1257,7 @@ export async function PATCH(request: NextRequest) {
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = name
+    if (comments !== undefined) updates.comments = comments
 
     const { data: updatedSource, error: updateError } = await supabase
       .from('knowledge_sources')

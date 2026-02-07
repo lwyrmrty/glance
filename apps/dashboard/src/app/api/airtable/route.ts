@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // ============================================
 // GET /api/airtable?action=bases — List bases the user has access to
 // GET /api/airtable?action=tables&baseId=xxx — List tables in a base
+// GET /api/airtable?action=views&baseId=xxx&tableId=xxx — List views in a table
 // ============================================
 
 export async function GET(request: NextRequest) {
@@ -86,9 +87,11 @@ export async function GET(request: NextRequest) {
       }
 
       const data = await response.json()
-      const tables = (data.tables || []).map((t: { id: string; name: string }) => ({
+      const tables = (data.tables || []).map((t: { id: string; name: string; fields?: { id: string; name: string; type: string }[]; views?: { id: string; name: string; type: string }[] }) => ({
         id: t.id,
         name: t.name,
+        fields: (t.fields || []).map(f => ({ id: f.id, name: f.name, type: f.type })),
+        views: (t.views || []).map(v => ({ id: v.id, name: v.name, type: v.type })),
       }))
 
       return NextResponse.json({ tables })

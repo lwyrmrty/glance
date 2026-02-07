@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { useToast } from '@/components/Toast'
+import { RichTextField } from '@/components/RichTextField'
 
 // Document icon SVG used for markdown/text file sources
 function DocIcon({ className }: { className?: string }) {
@@ -38,6 +39,7 @@ interface KnowledgeSourceRecord {
   type: string
   config: Record<string, unknown>
   content: string | null
+  comments: string
   sync_status: string
   last_synced_at: string | null
   chunk_count: number
@@ -71,6 +73,8 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
   const [shareLink, setShareLink] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [editName, setEditName] = useState('')
+  const [editComments, setEditComments] = useState('')
+  const [createComments, setCreateComments] = useState('')
 
   // Markdown file upload state
   const [mdFileName, setMdFileName] = useState('')
@@ -79,11 +83,16 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
 
   // Airtable create flow state
   const [airtableBases, setAirtableBases] = useState<{ id: string; name: string }[]>([])
-  const [airtableTables, setAirtableTables] = useState<{ id: string; name: string }[]>([])
+  const [airtableTables, setAirtableTables] = useState<{ id: string; name: string; fields?: { id: string; name: string; type: string }[]; views?: { id: string; name: string; type: string }[] }[]>([])
   const [selectedBaseId, setSelectedBaseId] = useState('')
   const [selectedBaseName, setSelectedBaseName] = useState('')
   const [selectedTableId, setSelectedTableId] = useState('')
   const [selectedTableName, setSelectedTableName] = useState('')
+  const [selectedViewId, setSelectedViewId] = useState('')
+  const [selectedViewName, setSelectedViewName] = useState('')
+  const [availableViews, setAvailableViews] = useState<{ id: string; name: string; type: string }[]>([])
+  const [availableFields, setAvailableFields] = useState<{ id: string; name: string; type: string }[]>([])
+  const [selectedFields, setSelectedFields] = useState<string[]>([])
   const [loadingBases, setLoadingBases] = useState(false)
   const [loadingTables, setLoadingTables] = useState(false)
 
@@ -147,6 +156,7 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
     const source = sources.find(s => s.id === sourceId)
     setSelectedSourceId(sourceId)
     setEditName(source?.name || '')
+    setEditComments(source?.comments || '')
     setPanelView('edit')
   }
 
@@ -157,6 +167,7 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
     setShareLink('')
     setMdFileName('')
     setMdFileContent('')
+    setCreateComments('')
     setPanelView('create')
   }
 
@@ -209,6 +220,11 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
     setSelectedBaseName(baseName)
     setSelectedTableId('')
     setSelectedTableName('')
+    setSelectedViewId('')
+    setSelectedViewName('')
+    setAvailableViews([])
+    setAvailableFields([])
+    setSelectedFields([])
     setAirtableTables([])
     setLoadingTables(true)
 
@@ -237,7 +253,7 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
       const response = await fetch('/api/knowledge', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedSourceId, name: editName.trim() }),
+        body: JSON.stringify({ id: selectedSourceId, name: editName.trim(), comments: editComments.trim() }),
       })
 
       const data = await response.json()
@@ -323,6 +339,11 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bodyPayload: Record<string, any> = { type: selectedCreateType === 'airtable' ? 'airtable_table' : selectedCreateType }
+      // Only include comments if user actually typed something (RichTextField may emit <p></p> for empty)
+      const cleanedComments = createComments.replace(/<[^>]+>/g, '').trim()
+      if (cleanedComments) {
+        bodyPayload.comments = createComments.trim()
+      }
 
       if (selectedCreateType === 'google_doc' || selectedCreateType === 'google_sheet') {
         bodyPayload.shareLink = shareLink.trim()
@@ -331,6 +352,14 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
         bodyPayload.baseName = selectedBaseName
         bodyPayload.tableId = selectedTableId
         bodyPayload.tableName = selectedTableName
+        if (selectedViewId) {
+          bodyPayload.viewId = selectedViewId
+          bodyPayload.viewName = selectedViewName
+        }
+        // Only send selectedFields if user deselected some (not all)
+        if (selectedFields.length > 0 && selectedFields.length < availableFields.length) {
+          bodyPayload.selectedFields = selectedFields
+        }
       } else if (selectedCreateType === 'markdown') {
         bodyPayload.content = mdFileContent
         bodyPayload.fileName = mdFileName
@@ -353,11 +382,13 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
       setSources(prev => [data.source, ...prev])
       setSelectedSourceId(data.source.id)
       setEditName(data.source.name || '')
-        setPanelView('edit')
-        setShareLink('')
-        setMdFileName('')
-        setMdFileContent('')
-        showToast(`Synced successfully! ${data.chunkCount} chunks created.`)
+      setEditComments(data.source.comments || '')
+      setPanelView('edit')
+      setShareLink('')
+      setMdFileName('')
+      setMdFileContent('')
+      setCreateComments('')
+      showToast(`Synced successfully! ${data.chunkCount} chunks created.`)
     } catch (error) {
       console.error('Create & Sync error:', error)
       showToast(error instanceof Error ? error.message : 'Sync failed. Please try again.', 'error')
@@ -581,6 +612,20 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                 <input className="formfields textfield w-input" maxLength={256} name="name" placeholder="" type="text" value={editName} onChange={(e) => setEditName(e.target.value)} />
                               </div>
 
+                              <div className="fieldblocks">
+                                <div className="labelrow">
+                                  <div className="labeltext">Comments</div>
+                                  <div className="labeldivider"></div>
+                                </div>
+                                <div className="fieldexplainer">Guide for chat — describe when this source should be used.</div>
+                                <RichTextField
+                                  value={editComments}
+                                  onChange={setEditComments}
+                                  placeholder="e.g. Use this when visitors ask about investors or sectors"
+                                  height={120}
+                                />
+                              </div>
+
                               {(selectedSource.type === 'google_doc' || selectedSource.type === 'google_sheet') && (
                                 <div className="fieldblocks">
                                   <div className="labelrow">
@@ -619,6 +664,28 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                       {(selectedSource.config as { tableName?: string })?.tableName || (selectedSource.config as { tableId?: string })?.tableId || '—'}
                                     </div>
                                   </div>
+                                  {(selectedSource.config as { viewName?: string })?.viewName && (
+                                    <div className="fieldblocks">
+                                      <div className="labelrow">
+                                        <div className="labeltext">View</div>
+                                        <div className="labeldivider"></div>
+                                      </div>
+                                      <div className="formfields textfield w-input" style={{ cursor: 'default' }}>
+                                        {(selectedSource.config as { viewName?: string })?.viewName || '—'}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {(selectedSource.config as { selectedFields?: string[] })?.selectedFields && (
+                                    <div className="fieldblocks">
+                                      <div className="labelrow">
+                                        <div className="labeltext">Fields</div>
+                                        <div className="labeldivider"></div>
+                                      </div>
+                                      <div className="formfields textfield w-input" style={{ cursor: 'default', fontSize: '13px' }}>
+                                        {(selectedSource.config as { selectedFields?: string[] })?.selectedFields?.join(', ') || 'All fields'}
+                                      </div>
+                                    </div>
+                                  )}
                                 </>
                               )}
 
@@ -861,6 +928,19 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                 disabled={syncing}
                               />
                             </div>
+                            <div className="fieldblocks">
+                              <div className="labelrow">
+                                <div className="labeltext">Comments</div>
+                                <div className="labeldivider"></div>
+                              </div>
+                              <div className="fieldexplainer">Guide for chat — describe when this source should be used.</div>
+                              <RichTextField
+                                value={createComments}
+                                onChange={setCreateComments}
+                                placeholder="e.g. Use when visitors ask about investors or sectors"
+                                height={100}
+                              />
+                            </div>
                           </div>
                         </form>
                       </div>
@@ -920,6 +1000,19 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                 value={shareLink}
                                 onChange={(e) => setShareLink(e.target.value)}
                                 disabled={syncing}
+                              />
+                            </div>
+                            <div className="fieldblocks">
+                              <div className="labelrow">
+                                <div className="labeltext">Comments</div>
+                                <div className="labeldivider"></div>
+                              </div>
+                              <div className="fieldexplainer">Guide for chat — describe when this source should be used.</div>
+                              <RichTextField
+                                value={createComments}
+                                onChange={setCreateComments}
+                                placeholder="e.g. Use when visitors ask about investors or sectors"
+                                height={100}
                               />
                             </div>
                           </div>
@@ -999,7 +1092,7 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                             </div>
 
                             {/* Table picker (shown after base is selected) */}
-                            {selectedBaseId && (
+                            {selectedBaseId && (<>
                               <div className="fieldblocks">
                                 <div className="labelrow">
                                   <div className="labeltext">Select a Table</div>
@@ -1018,6 +1111,12 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                       if (table) {
                                         setSelectedTableId(table.id)
                                         setSelectedTableName(table.name)
+                                        setSelectedViewId('')
+                                        setSelectedViewName('')
+                                        setAvailableViews(table.views || [])
+                                        const fields = table.fields || []
+                                        setAvailableFields(fields)
+                                        setSelectedFields(fields.map(f => f.name))
                                       }
                                     }}
                                     disabled={syncing}
@@ -1029,7 +1128,96 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                   </select>
                                 )}
                               </div>
-                            )}
+
+                              {/* View selector (optional) */}
+                              {selectedTableId && availableViews.length > 0 && (
+                                <div className="fieldblocks">
+                                  <div className="labelrow">
+                                    <div className="formlabel">View (optional)</div>
+                                    <div className="labeldivider"></div>
+                                  </div>
+                                  <select
+                                    className="formfields w-input"
+                                    value={selectedViewId}
+                                    onChange={(e) => {
+                                      const view = availableViews.find(v => v.id === e.target.value)
+                                      setSelectedViewId(view?.id || '')
+                                      setSelectedViewName(view?.name || '')
+                                    }}
+                                    disabled={syncing}
+                                  >
+                                    <option value="">All records (no view filter)</option>
+                                    {availableViews.map(view => (
+                                      <option key={view.id} value={view.id}>{view.name}</option>
+                                    ))}
+                                  </select>
+                                  <div className="fieldexplainer">Select a view to only sync records visible in that view.</div>
+                                </div>
+                              )}
+
+                              {/* Field selector */}
+                              {selectedTableId && availableFields.length > 0 && (
+                                <div className="fieldblocks">
+                                  <div className="labelrow">
+                                    <div className="formlabel">Fields to sync</div>
+                                    <div className="labeldivider"></div>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                                    <button
+                                      type="button"
+                                      className="text-xs"
+                                      style={{ background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: '12px', opacity: 0.7 }}
+                                      onClick={() => setSelectedFields(availableFields.map(f => f.name))}
+                                    >
+                                      Select all
+                                    </button>
+                                    <span style={{ opacity: 0.4 }}>|</span>
+                                    <button
+                                      type="button"
+                                      className="text-xs"
+                                      style={{ background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: '12px', opacity: 0.7 }}
+                                      onClick={() => setSelectedFields([])}
+                                    >
+                                      Deselect all
+                                    </button>
+                                  </div>
+                                  <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '6px', padding: '8px' }}>
+                                    {availableFields.map(field => (
+                                      <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', cursor: 'pointer', fontSize: '14px' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedFields.includes(field.name)}
+                                          onChange={(ev) => {
+                                            if (ev.target.checked) {
+                                              setSelectedFields(prev => [...prev, field.name])
+                                            } else {
+                                              setSelectedFields(prev => prev.filter(f => f !== field.name))
+                                            }
+                                          }}
+                                          disabled={syncing}
+                                        />
+                                        <span>{field.name}</span>
+                                        <span style={{ opacity: 0.4, fontSize: '11px', marginLeft: 'auto' }}>{field.type}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                  <div className="fieldexplainer">Uncheck fields you don&apos;t want in the knowledge base (e.g. IDs, internal notes).</div>
+                                </div>
+                              )}
+                            </>)}
+                            <div className="fieldblocks">
+                              <div className="labelrow">
+                                <div className="labeltext">Comments</div>
+                                <div className="labeldivider"></div>
+                              </div>
+                              <div className="fieldexplainer">Guide for chat — describe when this source should be used.</div>
+                              <RichTextField
+                                value={createComments}
+                                onChange={setCreateComments}
+                                placeholder="e.g. Use when visitors ask about investors or sectors"
+                                height={100}
+                              />
+                            </div>
                           </div>
                         </form>
                       </div>
@@ -1146,6 +1334,19 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                                 Markdown (.md) and plain text (.txt) files are supported.
                               </div>
                             </div>
+                            <div className="fieldblocks">
+                              <div className="labelrow">
+                                <div className="labeltext">Comments</div>
+                                <div className="labeldivider"></div>
+                              </div>
+                              <div className="fieldexplainer">Guide for chat — describe when this source should be used.</div>
+                              <RichTextField
+                                value={createComments}
+                                onChange={setCreateComments}
+                                placeholder="e.g. Use when visitors ask about investors or sectors"
+                                height={100}
+                              />
+                            </div>
                           </div>
                         </form>
                       </div>
@@ -1209,6 +1410,19 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
                               <div className="fieldexplainer" style={{ marginTop: '6px' }}>
                                 All pages linked from this URL on the same domain will be crawled and indexed.
                               </div>
+                            </div>
+                            <div className="fieldblocks">
+                              <div className="labelrow">
+                                <div className="labeltext">Comments</div>
+                                <div className="labeldivider"></div>
+                              </div>
+                              <div className="fieldexplainer">Guide for chat — describe when this source should be used.</div>
+                              <RichTextField
+                                value={createComments}
+                                onChange={setCreateComments}
+                                placeholder="e.g. Use when visitors ask about investors or sectors"
+                                height={100}
+                              />
                             </div>
                           </div>
                         </form>
