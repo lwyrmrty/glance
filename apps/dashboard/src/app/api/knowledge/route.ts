@@ -232,10 +232,17 @@ async function fetchWebsiteContent(rootUrl: string): Promise<string> {
                     $('title').first().text().trim().split(' — ')[0].split(' | ')[0] ||
                     url.split('/').pop() || 'Untitled'
 
+      // Insert separators between block-level and table elements so text
+      // extraction doesn't mash everything together (e.g., table cells)
+      $('tr').each((_, el) => { $(el).append('\n') })
+      $('td, th').each((_, el) => { $(el).append(' | ') })
+      $('div, p, h1, h2, h3, h4, h5, h6, li, br, section, article').each((_, el) => { $(el).append('\n') })
+
       // Extract main content text
       const bodyText = $('body').text()
-        .replace(/\s+/g, ' ')         // collapse whitespace
-        .replace(/ {2,}/g, ' ')        // collapse multiple spaces
+        .replace(/[ \t]+/g, ' ')       // collapse horizontal whitespace (keep newlines)
+        .replace(/ *\n */g, '\n')      // clean up spaces around newlines
+        .replace(/\n{3,}/g, '\n\n')    // max 2 consecutive newlines
         .trim()
 
       if (bodyText.length < 50) continue // Skip nearly empty pages
