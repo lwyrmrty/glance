@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 // CORS headers for cross-origin widget requests
@@ -18,7 +18,7 @@ export async function GET(
 ) {
   const { id } = await params
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: widget, error } = await supabase
     .from('widgets')

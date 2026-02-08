@@ -11,7 +11,6 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const savedTldrTitle = (tab as any).tldr_title ?? ''
   const savedTldrSubtitle = (tab as any).tldr_subtitle ?? ''
   const savedBannerUrl = (tab as any).tldr_banner_url ?? null
-  const savedLogoUrl = (tab as any).tldr_logo_url ?? null
   const savedSocials = (tab as any).tldr_socials ?? [
     { platform: 'linkedin', url: '' },
     { platform: 'x', url: '' },
@@ -26,18 +25,15 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const [tldrTitle, setTldrTitle] = useState(savedTldrTitle)
   const [tldrSubtitle, setTldrSubtitle] = useState(savedTldrSubtitle)
   const [tldrBannerPreview, setTldrBannerPreview] = useState<string | null>(savedBannerUrl)
-  const [tldrLogoPreview, setTldrLogoPreview] = useState<string | null>(savedLogoUrl)
   const [tldrSocials, setTldrSocials] = useState<{ platform: string; url: string }[]>(savedSocials)
   const [tldrContentLinks, setTldrContentLinks] = useState<{ title: string; description: string; link: string; tabLink: string; imageUrl?: string }[]>(savedContentLinks)
 
   // Refs
   const bannerInputRef = useRef<HTMLInputElement>(null)
-  const logoInputRef = useRef<HTMLInputElement>(null)
   const contentImageRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // File refs for actual upload on save
   const bannerFileRef = useRef<File | null>(null)
-  const logoFileRef = useRef<File | null>(null)
   const contentImageFileRefs = useRef<Record<number, File>>({})
 
   // Tab links for content link pills
@@ -49,13 +45,6 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     if (!file) return
     bannerFileRef.current = file
     setTldrBannerPreview(URL.createObjectURL(file))
-  }, [])
-
-  const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    logoFileRef.current = file
-    setTldrLogoPreview(URL.createObjectURL(file))
   }, [])
 
   const handleContentImageUpload = useCallback((index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,7 +73,6 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     tldrTitle !== savedTldrTitle ||
     tldrSubtitle !== savedTldrSubtitle ||
     tldrBannerPreview !== savedBannerUrl ||
-    tldrLogoPreview !== savedLogoUrl ||
     JSON.stringify(tldrSocials) !== JSON.stringify(savedSocials) ||
     JSON.stringify(tldrContentLinks) !== JSON.stringify(savedContentLinks)
 
@@ -103,20 +91,6 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
         bannerUrl = urlData.publicUrl
         setTldrBannerPreview(bannerUrl)
         bannerFileRef.current = null
-      }
-    }
-
-    // Upload logo if a new file was selected
-    let logoUrl = tldrLogoPreview
-    if (logoFileRef.current) {
-      const ext = logoFileRef.current.name.split('.').pop()
-      const path = `${glanceId}/logo-${tabIndex}-${Date.now()}.${ext}`
-      const { error } = await supabase.storage.from('logos').upload(path, logoFileRef.current, { upsert: true })
-      if (!error) {
-        const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path)
-        logoUrl = urlData.publicUrl
-        setTldrLogoPreview(logoUrl)
-        logoFileRef.current = null
       }
     }
 
@@ -140,7 +114,6 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
       tldr_title: tldrTitle,
       tldr_subtitle: tldrSubtitle,
       tldr_banner_url: bannerUrl,
-      tldr_logo_url: logoUrl,
       tldr_socials: tldrSocials,
       tldr_content_links: updatedContentLinks,
     })

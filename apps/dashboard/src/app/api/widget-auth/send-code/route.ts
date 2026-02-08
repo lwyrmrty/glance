@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 const corsHeaders = {
@@ -12,7 +12,7 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   try {
     const body = await request.json()

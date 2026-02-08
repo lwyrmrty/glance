@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 // CORS headers — the widget submits from external sites
@@ -13,7 +13,7 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   try {
     const formData = await request.formData()

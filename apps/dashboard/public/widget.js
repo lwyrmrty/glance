@@ -729,7 +729,7 @@
 .widget-content.account .tabheading-wrap.center { text-align: center; padding: 16px 16px 4px; }
 .widget-content.account .tab-heading { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
 .widget-content.account .tab-subheading { font-size: 13px; color: #666; }
-.formcontent-wrap { padding: 0 16px 16px; }
+.widget-content.account .formcontent-wrap { padding: 0 16px 16px; }
 .formwrap.loginwrap { display: flex; flex-direction: column; gap: 10px; }
 .formwrap.loginwrap[account-flow="magic-create"],
 .formwrap.loginwrap[account-flow="magic-login"] { display: none; }

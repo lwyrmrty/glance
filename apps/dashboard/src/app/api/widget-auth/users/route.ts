@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
  * Requires dashboard authentication.
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: authData, error: authError } = await supabase.auth.getClaims()
   if (authError || !authData?.claims) {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
  * Requires dashboard authentication.
  */
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: authData, error: authError } = await supabase.auth.getClaims()
   if (authError || !authData?.claims) {

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 const corsHeaders = {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse('Missing widget_id', { status: 400 })
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Look up the workspace's Google OAuth credentials via the widget
   const { data: widget } = await supabase

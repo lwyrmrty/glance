@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   const redirectUri = `${baseUrl}/api/widget-auth/google/callback`
 
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Look up workspace and Google OAuth credentials from widget
     const { data: widget } = await supabase
