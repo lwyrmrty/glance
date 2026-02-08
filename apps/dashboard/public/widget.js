@@ -219,8 +219,8 @@
 }
 
 .glancewidget-tablink {
-  grid-column-gap: 6px;
-  grid-row-gap: 6px;
+  grid-column-gap: 8px;
+  grid-row-gap: 8px;
   opacity: .48;
   color: #fff9;
   text-align: center;
@@ -234,7 +234,7 @@
   justify-content: center;
   align-items: center;
   height: 100%;
-  padding: 0 4px 1px;
+  padding: 0 4px 0px;
   font-family: Figtree, sans-serif;
   font-size: 12px;
   font-weight: 400;
@@ -253,7 +253,7 @@
   background-color: #0003;
 }
 
-.tldrwidget-icon { width: 23px; height: 23px; }
+.tldrwidget-icon { width: 19px; height: 18px; }
 .tldrwidget-icon.sm { padding: 1px; }
 .tldr-nav-label { opacity: 1; }
 
@@ -723,21 +723,20 @@
 .upload-delete-text:hover { opacity: 1; }
 
 /* Auth gate styles */
-.widget-content.account { display: flex; flex-direction: column; }
-.widget-content.account .tabhero.no-pull { margin: -16px -16px 0 -16px; overflow: hidden; border-radius: 0; max-height: 120px; }
-.widget-content.account .tabhero.no-pull img { width: 100%; height: 120px; object-fit: cover; display: block; }
-.widget-content.account .tabheading-wrap.center { text-align: center; padding: 16px 16px 4px; }
-.widget-content.account .tab-heading { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-.widget-content.account .tab-subheading { font-size: 13px; color: #666; }
-.widget-content.account .formcontent-wrap { padding: 0 16px 16px; }
-.formwrap.loginwrap { display: flex; flex-direction: column; gap: 10px; }
+.widget-content.account { display: flex; flex-direction: column; padding: 10px 10px 0; }
+.widget-content.account .tabheading-wrap.center { text-align: center; padding-left: 20px; }
+.widget-content.account .tab-heading { font-size: 21px; margin-top: 7px; margin-bottom: 5px; }
+.widget-content.account .tab-subheading { margin-bottom: 7px; }
+.widget-content.account .formcontent-wrap { padding: 0 10px 10px; flex: none; }
+.formwrap.loginwrap { display: flex; flex-direction: column; gap: 10px; border: 1.5px solid var(--admin-border, #e5e5e5); background-color: #f8f8f8; border-radius: 10px; padding: 15px; flex: none; }
 .formwrap.loginwrap[account-flow="magic-create"],
 .formwrap.loginwrap[account-flow="magic-login"] { display: none; }
 .formwrap.loginwrap.active-flow { display: flex !important; }
-.google-auth-button { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: 1.5px solid var(--admin-border, #e5e5e5); border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; text-decoration: none; color: inherit; }
+.google-auth-button { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: 1.5px solid var(--admin-border, #e5e5e5); border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 500; transition: background 0.2s; text-decoration: none; color: inherit; height: 50px; background-color: #fff; }
 .google-auth-button:hover { background: #f5f5f5; }
 .google-auth-button .google-icon { width: 20px; height: 20px; border-radius: 4px; }
 .formlabel.smalldim { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; }
+.formwrap.loginwrap > .formfield-block > .labelrow > .formlabel.smalldim { margin: 5px 0; }
 .auth-gate-error { color: #dc2626; font-size: 13px; text-align: center; padding: 4px 0; }
 .auth-gate-resend { font-size: 13px; text-align: center; color: #666; }
 .auth-gate-resend a { color: var(--vcs-purple, #7C3AED); cursor: pointer; text-decoration: underline; }
@@ -1133,6 +1132,7 @@ function G(l,e,s,p,c,widgetEl){
   let showGoogle=auth.google_enabled!==false;
   let showMagic=auth.magic_link_enabled!==false;
   let fw=document.createElement("div");fw.className="formcontent-wrap";
+  let mc=null,ml=null;
   /* ---- Default flow ---- */
   let df=document.createElement("form");df.className="formwrap loginwrap active-flow";df.setAttribute("account-flow","default");
   /* Google auth button */
@@ -1158,7 +1158,7 @@ function G(l,e,s,p,c,widgetEl){
   let dv=document.createElement("div");dv.className="formfield-block";
   let dr=document.createElement("div");dr.className="labelrow";
   let dd1=document.createElement("div");dd1.className="labeldivider";dr.appendChild(dd1);
-  let dl=document.createElement("div");dl.className="formlabel smalldim";dl.textContent="Or Use Magical Link";dr.appendChild(dl);
+  let dl=document.createElement("div");dl.className="formlabel smalldim";dl.textContent="Or Use Login Code";dr.appendChild(dl);
   let dd2=document.createElement("div");dd2.className="labeldivider";dr.appendChild(dd2);
   dv.appendChild(dr);df.appendChild(dv);
   }
@@ -1173,8 +1173,8 @@ function G(l,e,s,p,c,widgetEl){
   ef.appendChild(ei);df.appendChild(ef);
   /* Error display */
   let errDiv=document.createElement("div");errDiv.className="auth-gate-error";errDiv.style.display="none";df.appendChild(errDiv);
-  /* Send Magic Code button */
-  let sb=document.createElement("input");sb.type="button";sb.className="formbutton w-button";sb.value="Send Magic Code";
+  /* Send Login Code button */
+  let sb=document.createElement("input");sb.type="button";sb.className="formbutton w-button";sb.value="Send Login Code";
   sb.addEventListener("click",async()=>{
     let email=ei.value.trim();
     if(!email){errDiv.textContent="Please enter your email address.";errDiv.style.display="block";return}
@@ -1182,20 +1182,20 @@ function G(l,e,s,p,c,widgetEl){
     try{
       let res=await fetch(c+"/api/widget-auth/send-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,widget_id:s})});
       let data=await res.json();
-      if(!res.ok){errDiv.textContent=data.error||"Failed to send code";errDiv.style.display="block";sb.disabled=!1;sb.value="Send Magic Code";return}
+      if(!res.ok){errDiv.textContent=data.error||"Failed to send code";errDiv.style.display="block";sb.disabled=!1;sb.value="Send Login Code";return}
       /* Switch to magic-create or magic-login */
-      df.classList.remove("active-flow");
+      df.classList.remove("active-flow");df.style.display="none";
       if(data.exists){ml.classList.add("active-flow");ml._email=email}
       else{mc.classList.add("active-flow");mc._email=email}
     }catch(err){errDiv.textContent="Something went wrong. Please try again.";errDiv.style.display="block"}
-    finally{sb.disabled=!1;sb.value="Send Magic Code"}
+    finally{sb.disabled=!1;sb.value="Send Login Code"}
   });
   df.appendChild(sb);
   }
   fw.appendChild(df);
   if(showMagic){
   /* ---- Magic Create flow (new user) ---- */
-  let mc=document.createElement("form");mc.className="formwrap loginwrap";mc.setAttribute("account-flow","magic-create");
+  mc=document.createElement("form");mc.className="formwrap loginwrap";mc.setAttribute("account-flow","magic-create");
   let mch=document.createElement("div");mch.className="tabheading-wrap center";
   let mchd=document.createElement("div");mchd.className="tab-heading";mchd.textContent="A 6-digit code has been sent to your email";mch.appendChild(mchd);
   let mchs=document.createElement("div");mchs.className="tab-subheading auth-gate-resend";mchs.innerHTML='Didn\'t get it? <a href="#">Resend now.</a>';
@@ -1206,7 +1206,7 @@ function G(l,e,s,p,c,widgetEl){
   /* Code input */
   let mcf1=document.createElement("div");mcf1.className="formfield-block";
   let mcr1=document.createElement("div");mcr1.className="labelrow";
-  let mcl1=document.createElement("div");mcl1.className="formlabel";mcl1.textContent="Secret Code";mcr1.appendChild(mcl1);
+  let mcl1=document.createElement("div");mcl1.className="formlabel";mcl1.textContent="Login Code";mcr1.appendChild(mcl1);
   let mcd1=document.createElement("div");mcd1.className="labeldivider";mcr1.appendChild(mcd1);
   mcf1.appendChild(mcr1);
   let mci1=document.createElement("input");mci1.className="formfields w-input";mci1.type="text";mci1.maxLength=6;mci1.placeholder="";
@@ -1235,8 +1235,8 @@ function G(l,e,s,p,c,widgetEl){
   mcf3.appendChild(mci3);mc.appendChild(mcf3);
   /* Error */
   let mcErr=document.createElement("div");mcErr.className="auth-gate-error";mcErr.style.display="none";mc.appendChild(mcErr);
-  /* Create Account button */
-  let mcBtn=document.createElement("input");mcBtn.type="button";mcBtn.className="formbutton w-button";mcBtn.value="Create Account";
+  /* Login button */
+  let mcBtn=document.createElement("input");mcBtn.type="button";mcBtn.className="formbutton w-button";mcBtn.value="Login";
   mcBtn.addEventListener("click",async()=>{
     let code=mci1.value.trim(),fn=mci2.value.trim(),ln=mci3.value.trim();
     if(!code||!fn||!ln){mcErr.textContent="Please fill in all fields.";mcErr.style.display="block";return}
@@ -1244,14 +1244,14 @@ function G(l,e,s,p,c,widgetEl){
     try{
       let res=await fetch(c+"/api/widget-auth/verify-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:mc._email,code,widget_id:s,first_name:fn,last_name:ln})});
       let data=await res.json();
-      if(!res.ok){mcErr.textContent=data.error||"Verification failed";mcErr.style.display="block";mcBtn.disabled=!1;mcBtn.value="Create Account";return}
+      if(!res.ok){mcErr.textContent=data.error||"Verification failed";mcErr.style.display="block";mcBtn.disabled=!1;mcBtn.value="Login";return}
       localStorage.setItem("glance_session_"+p,data.token);
       if(widgetEl)widgetEl.renderActiveTab()
-    }catch(err){mcErr.textContent="Something went wrong. Please try again.";mcErr.style.display="block";mcBtn.disabled=!1;mcBtn.value="Create Account"}
+    }catch(err){mcErr.textContent="Something went wrong. Please try again.";mcErr.style.display="block";mcBtn.disabled=!1;mcBtn.value="Login"}
   });
   mc.appendChild(mcBtn);fw.appendChild(mc);
   /* ---- Magic Login flow (existing user) ---- */
-  let ml=document.createElement("form");ml.className="formwrap loginwrap";ml.setAttribute("account-flow","magic-login");
+  ml=document.createElement("form");ml.className="formwrap loginwrap";ml.setAttribute("account-flow","magic-login");
   let mlh=document.createElement("div");mlh.className="tabheading-wrap center";
   let mlhd=document.createElement("div");mlhd.className="tab-heading";mlhd.textContent="A 6-digit code has been sent to your email";mlh.appendChild(mlhd);
   let mlhs=document.createElement("div");mlhs.className="tab-subheading auth-gate-resend";mlhs.innerHTML='Didn\'t get it? <a href="#">Resend now.</a>';
@@ -1262,7 +1262,7 @@ function G(l,e,s,p,c,widgetEl){
   /* Code input */
   let mlf1=document.createElement("div");mlf1.className="formfield-block";
   let mlr1=document.createElement("div");mlr1.className="labelrow";
-  let mll1=document.createElement("div");mll1.className="formlabel";mll1.textContent="Secret Code";mlr1.appendChild(mll1);
+  let mll1=document.createElement("div");mll1.className="formlabel";mll1.textContent="Login Code";mlr1.appendChild(mll1);
   let mld1=document.createElement("div");mld1.className="labeldivider";mlr1.appendChild(mld1);
   mlf1.appendChild(mlr1);
   let mli1=document.createElement("input");mli1.className="formfields w-input";mli1.type="text";mli1.maxLength=6;mli1.placeholder="";

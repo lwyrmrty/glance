@@ -30,10 +30,12 @@ export function PreviewPage({ glance, workspaceId }: PreviewPageProps) {
   const widgetRef = useRef<HTMLElement | null>(null)
 
   const buttonStyle = (glance.button_style ?? {}) as Record<string, unknown>
+  const workspace = (glance as any).workspaces as Record<string, unknown> | null
 
   // Build the widget config in the same shape the embeddable widget expects
   const widgetConfig = {
     id: glance.id,
+    workspace_id: glance.workspace_id,
     name: glance.name,
     logo_url: glance.logo_url,
     theme_color: glance.theme_color,
@@ -41,6 +43,13 @@ export function PreviewPage({ glance, workspaceId }: PreviewPageProps) {
     prompts: (buttonStyle.prompts as unknown[]) ?? [],
     callout_text: (buttonStyle.callout_text as string) ?? '',
     callout_url: (buttonStyle.callout_url as string) ?? '',
+    auth: {
+      google_enabled: (workspace?.auth_google_enabled as boolean) ?? false,
+      magic_link_enabled: (workspace?.auth_magic_link_enabled as boolean) ?? true,
+      banner_url: (workspace?.auth_banner_url as string) ?? null,
+      title: (workspace?.auth_title as string) ?? 'Premium Content',
+      subtitle: (workspace?.auth_subtitle as string) ?? 'Login or create your FREE account to access this content.',
+    },
   }
 
   useEffect(() => {

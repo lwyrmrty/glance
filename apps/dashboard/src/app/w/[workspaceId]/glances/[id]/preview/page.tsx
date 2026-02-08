@@ -19,7 +19,7 @@ export default async function GlancePreviewPage({ params }: { params: Promise<{ 
 
   const { data: glance } = await supabase
     .from('widgets')
-    .select('*')
+    .select('*, workspaces(auth_google_enabled, auth_magic_link_enabled, auth_banner_url, auth_title, auth_subtitle)')
     .eq('id', id)
     .single()
 

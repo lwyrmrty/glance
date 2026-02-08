@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     const loopsApiKey = process.env.LOOPS_API_KEY
     if (loopsApiKey) {
       try {
-        await fetch('https://app.loops.so/api/v1/transactional', {
+        const loopsRes = await fetch('https://app.loops.so/api/v1/transactional', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${loopsApiKey}`,
@@ -117,13 +117,18 @@ export async function POST(request: NextRequest) {
               code,
               action: userExists ? 'login' : 'create your account',
               workspace_name: workspaceName,
+              workspace_slug: workspaceName.toLowerCase().replace(/[^a-z0-9]/g, ''),
               email: email.toLowerCase(),
-              first_name: existingUser?.first_name || '',
-              logo_url: (widget as any).logo_url || '',
+              first_name: existingUser?.first_name || 'there',
+              logo_url: (widget as any).logo_url || 'https://placehold.co/1x1/transparent/transparent.png',
             },
           }),
           signal: AbortSignal.timeout(10000),
         })
+        if (!loopsRes.ok) {
+          const loopsBody = await loopsRes.text()
+          console.error('[Glance] Loops API error:', loopsRes.status, loopsBody)
+        }
       } catch (err) {
         console.error('[Glance] Failed to send magic code email via Loops:', err)
         // Don't fail the request — code is stored, user can request resend

@@ -3005,8 +3005,8 @@ em {
 }
 
 .glancewidget-tablink {
-  grid-column-gap: 6px;
-  grid-row-gap: 6px;
+  grid-column-gap: 7px;
+  grid-row-gap: 7px;
   opacity: .48;
   color: #fff9;
   text-align: center;
@@ -3155,8 +3155,8 @@ em {
 }
 
 .tldrwidget-icon {
-  width: 23px;
-  height: 23px;
+  width: 20px;
+  height: 20px;
 }
 
 .tldrwidget-icon.sm {
