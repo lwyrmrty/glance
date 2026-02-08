@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Look up workspace_id from widget
     const { data: widget, error: widgetError } = await supabase
       .from('widgets')
-      .select('id, workspace_id')
+      .select('id, workspace_id, logo_url, workspaces(name)')
       .eq('id', widget_id)
       .eq('is_active', true)
       .single()
@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     const userExists = !!existingUser
+    const workspaceName = (widget as any).workspaces?.name || ''
 
     // Send code via Loops.so
     const loopsApiKey = process.env.LOOPS_API_KEY
@@ -115,6 +116,10 @@ export async function POST(request: NextRequest) {
             dataVariables: {
               code,
               action: userExists ? 'login' : 'create your account',
+              workspace_name: workspaceName,
+              email: email.toLowerCase(),
+              first_name: existingUser?.first_name || '',
+              logo_url: (widget as any).logo_url || '',
             },
           }),
           signal: AbortSignal.timeout(10000),
