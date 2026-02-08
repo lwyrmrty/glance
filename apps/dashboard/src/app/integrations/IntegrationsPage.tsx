@@ -11,9 +11,10 @@ interface IntegrationsPageProps {
   airtableKeyHint?: string | null
   workspaceName?: string
   workspaceId?: string
+  glances?: Array<{ id: string; name: string; logo_url?: string | null }>
 }
 
-export function IntegrationsPage({ airtableConnected: initialAirtableConnected = false, airtableKeyHint: initialKeyHint = null, workspaceName, workspaceId }: IntegrationsPageProps) {
+export function IntegrationsPage({ airtableConnected: initialAirtableConnected = false, airtableKeyHint: initialKeyHint = null, workspaceName, workspaceId, glances = [] }: IntegrationsPageProps) {
   const { showToast } = useToast()
   const [activeTab, setActiveTab] = useState<ActiveTab>('integrations')
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string | null>(null)
@@ -119,7 +120,7 @@ export function IntegrationsPage({ airtableConnected: initialAirtableConnected =
   return (
     <div className="pagewrapper">
       <div className="pagecontent">
-        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} glances={glances} />
 
         {/* ===== Integrations Tab ===== */}
         {activeTab === 'integrations' && (

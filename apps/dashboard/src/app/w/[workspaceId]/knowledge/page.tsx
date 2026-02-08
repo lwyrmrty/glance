@@ -24,5 +24,13 @@ export default async function KnowledgeRoute({ params }: { params: Promise<{ wor
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: false })
 
-  return <KnowledgePage initialSources={sources ?? []} workspaceName={workspace.workspace_name} workspaceId={workspaceId} />
+  // Fetch glances for sidebar
+  const { data: glances } = await supabase
+    .from('widgets')
+    .select('id, name, logo_url')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(3)
+
+  return <KnowledgePage initialSources={sources ?? []} workspaceName={workspace.workspace_name} workspaceId={workspaceId} glances={glances ?? []} />
 }

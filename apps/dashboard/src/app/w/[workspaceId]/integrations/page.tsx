@@ -33,12 +33,21 @@ export default async function IntegrationsRoute({ params }: { params: Promise<{ 
     airtableKeyHint = key.slice(0, 6) + '...' + key.slice(-4)
   }
 
+  // Fetch glances for sidebar
+  const { data: glances } = await supabase
+    .from('widgets')
+    .select('id, name, logo_url')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(3)
+
   return (
     <IntegrationsPage
       airtableConnected={airtableConnected}
       airtableKeyHint={airtableKeyHint}
       workspaceName={workspace.workspace_name}
       workspaceId={workspaceId}
+      glances={glances ?? []}
     />
   )
 }

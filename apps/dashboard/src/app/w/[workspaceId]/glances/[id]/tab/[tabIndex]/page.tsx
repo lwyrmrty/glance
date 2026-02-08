@@ -35,6 +35,14 @@ export default async function TabEditorPage({ params }: { params: Promise<{ work
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: false })
 
+  // Fetch glances for sidebar
+  const { data: glances } = await supabase
+    .from('widgets')
+    .select('id, name, logo_url')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(3)
+
   return (
     <TabEditor
       glanceId={id}
@@ -43,6 +51,7 @@ export default async function TabEditorPage({ params }: { params: Promise<{ work
       knowledgeSources={knowledgeSources ?? []}
       workspaceName={workspace.workspace_name}
       workspaceId={workspaceId}
+      glances={glances ?? []}
     />
   )
 }

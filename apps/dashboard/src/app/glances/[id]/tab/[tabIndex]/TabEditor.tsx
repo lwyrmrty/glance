@@ -18,9 +18,10 @@ interface TabEditorProps {
   knowledgeSources?: KnowledgeSourceSummary[]
   workspaceName?: string
   workspaceId?: string
+  glances?: Array<{ id: string; name: string; logo_url?: string | null }>
 }
 
-export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources = [], workspaceName, workspaceId }: TabEditorProps) {
+export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources = [], workspaceName, workspaceId, glances = [] }: TabEditorProps) {
   const prefix = workspaceId ? `/w/${workspaceId}` : ''
   const router = useRouter()
   const { showToast } = useToast()
@@ -116,7 +117,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   return (
     <div className="pagewrapper" style={{ '--vcs-purple': themeColor } as React.CSSProperties}>
       <div className="pagecontent">
-        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} glances={glances} />
 
         <div className="mainwrapper">
           <div className="maincontent flex">

@@ -28,5 +28,13 @@ export default async function GlanceEditorPage({ params }: { params: Promise<{ w
     glance = widget
   }
 
-  return <GlanceEditor glanceId={id} workspaceId={workspaceId} workspaceName={workspace.workspace_name} glance={glance} />
+  // Fetch glances for sidebar
+  const { data: glances } = await supabase
+    .from('widgets')
+    .select('id, name, logo_url')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(3)
+
+  return <GlanceEditor glanceId={id} workspaceId={workspaceId} workspaceName={workspace.workspace_name} glance={glance} glances={glances ?? []} />
 }

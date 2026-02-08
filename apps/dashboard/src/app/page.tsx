@@ -55,16 +55,22 @@ export default async function Home() {
   // Calculate tab counts for each widget
   const widgetTabCounts: Record<string, number> = {}
   if (widgets && widgets.length > 0) {
-    const widgetIds = widgets.map(w => w.id)
-    const { data: tabs } = await supabase
-      .from('tabs')
-      .select('widget_id, label')
-      .in('widget_id', widgetIds)
-    
-    if (tabs) {
-      for (const tab of tabs) {
-        if (tab.label?.trim()) {
-          widgetTabCounts[tab.widget_id] = (widgetTabCounts[tab.widget_id] || 0) + 1
+    const widgetIds = widgets.map(w => w.id).filter(Boolean)
+    if (widgetIds.length > 0) {
+      const { data: tabs, error: tabsError } = await supabase
+        .from('tabs')
+        .select('widget_id')
+        .in('widget_id', widgetIds)
+      
+      if (tabsError) {
+        console.error('Error fetching tabs:', tabsError)
+      }
+      
+      if (tabs && Array.isArray(tabs)) {
+        for (const tab of tabs) {
+          if (tab?.widget_id) {
+            widgetTabCounts[tab.widget_id] = (widgetTabCounts[tab.widget_id] || 0) + 1
+          }
         }
       }
     }

@@ -64,9 +64,10 @@ interface KnowledgePageProps {
   initialSources?: KnowledgeSourceRecord[]
   workspaceName?: string
   workspaceId?: string
+  glances?: Array<{ id: string; name: string; logo_url?: string | null }>
 }
 
-export function KnowledgePage({ initialSources = [], workspaceName, workspaceId }: KnowledgePageProps) {
+export function KnowledgePage({ initialSources = [], workspaceName, workspaceId, glances = [] }: KnowledgePageProps) {
   const { showToast } = useToast()
   const [panelView, setPanelView] = useState<PanelView>('empty')
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>(initialSources)
@@ -402,7 +403,7 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId 
   return (
     <div className="pagewrapper">
       <div className="pagecontent">
-        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} glances={glances} />
 
         <div className="mainwrapper padd">
           <div className="maincontent flex">

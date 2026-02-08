@@ -128,13 +128,19 @@ export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: Wo
                   </a>
                 )}
                 <div className="workspacerow">
-                  {workspaces.map((ws, index) => (
+                  {workspaces.map((ws, index) => {
+                    // If there's exactly one Glance, navigate directly to it
+                    const workspaceHref = ws.glance_count === 1 && ws.glances[0] 
+                      ? `/w/${ws.id}/glances/${ws.glances[0].id}`
+                      : `/w/${ws.id}/glances`
+                    
+                    return (
                     <div key={ws.id}>
                       {index > 0 && <div className="divider"></div>}
                       <div className="workspaceitem">
                         <div className="workspacecard">
                           <div className="workspacerows">
-                            <Link href={`/w/${ws.id}/glances`} className="workspacelogo-row w-inline-block" style={{ textDecoration: 'none', color: 'inherit' }}>
+                            <Link href={workspaceHref} className="workspacelogo-row w-inline-block" style={{ textDecoration: 'none', color: 'inherit' }}>
                               <div className="workspaceicon">
                                 {ws.glance_count > 0 && ws.glances[0]?.logo_url ? (
                                   <img src={ws.glances[0].logo_url} loading="lazy" alt="" className="fullimage" />
@@ -149,7 +155,7 @@ export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: Wo
                                 <div className="workspacesubtitle">{ws.glance_count} {ws.glance_count === 1 ? 'Glance' : 'Glances'}</div>
                               </div>
                             </Link>
-                            <Link href={`/w/${ws.id}/glances`} className="button lite w-inline-block" style={{ textDecoration: 'none' }}>
+                            <Link href={workspaceHref} className="button lite w-inline-block" style={{ textDecoration: 'none' }}>
                               <div>Go to Workspace</div>
                             </Link>
                           </div>
@@ -183,7 +189,8 @@ export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: Wo
                         </div>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </div>

@@ -26,9 +26,10 @@ interface GlanceEditorProps {
   workspaceId?: string
   workspaceName?: string
   glance?: Glance | null
+  glances?: Array<{ id: string; name: string; logo_url?: string | null }>
 }
 
-export default function GlanceEditor({ glanceId, workspaceId, workspaceName, glance }: GlanceEditorProps) {
+export default function GlanceEditor({ glanceId, workspaceId, workspaceName, glance, glances = [] }: GlanceEditorProps) {
   const isNew = glanceId === 'new'
   const router = useRouter()
   const { showToast } = useToast()
@@ -356,7 +357,7 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
   return (
     <div className="pagewrapper" style={{ '--vcs-purple': themeColor } as React.CSSProperties}>
       <div className="pagecontent">
-        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} glances={glances} />
 
         <div className="mainwrapper">
           <div className="maincontent flex">

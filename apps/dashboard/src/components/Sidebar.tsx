@@ -6,9 +6,10 @@ import { usePathname } from 'next/navigation'
 interface SidebarProps {
   workspaceName?: string
   workspaceId?: string
+  glances?: Array<{ id: string; name: string; logo_url?: string | null }>
 }
 
-export default function Sidebar({ workspaceName, workspaceId }: SidebarProps) {
+export default function Sidebar({ workspaceName, workspaceId, glances }: SidebarProps) {
   const pathname = usePathname()
 
   // Build the workspace URL prefix
@@ -23,6 +24,12 @@ export default function Sidebar({ workspaceName, workspaceId }: SidebarProps) {
     return cleanPathname === cleanHref || cleanPathname.startsWith(cleanHref + '/')
   }
 
+  // Check if we're on the Glances list page (not a specific Glance page)
+  const isGlancesListPage = pathname === `${prefix}/glances` || pathname === `${prefix}/glances/`
+
+  // Extract the current Glance ID from pathname if we're on a Glance page
+  const currentGlanceId = pathname.match(new RegExp(`${prefix}/glances/([^/]+)`))?.[1]
+
   return (
     <div className="navwrapper">
       <div className="navbartop">
@@ -36,11 +43,14 @@ export default function Sidebar({ workspaceName, workspaceId }: SidebarProps) {
               <div className="labeltext small">{workspaceName || 'Workspace'} <span className="dim">Workspace</span></div>
               <div className="labeldivider darker"></div>
             </div>
-            <NavItem
+            <GlancesNavItem
               href={`${prefix}/glances`}
               label="Glances"
               icon="/images/glanceicons.svg"
-              isActive={isActive(`${prefix}/glances`)}
+              isActive={isGlancesListPage}
+              glances={glances?.slice(0, 3) || []}
+              prefix={prefix}
+              currentGlanceId={currentGlanceId}
             />
             <NavItem
               href={`${prefix}/knowledge`}
@@ -159,6 +169,80 @@ function NavItem({ href, label, icon, isActive }: NavItemProps) {
         </div>
         <div className="activeindicator" style={{ display: isActive ? 'block' : 'none' }}></div>
       </Link>
+    </div>
+  )
+}
+
+interface GlancesNavItemProps {
+  href: string
+  label: string
+  icon: string
+  isActive: boolean
+  glances: Array<{ id: string; name: string; logo_url?: string | null }>
+  prefix: string
+  currentGlanceId?: string
+}
+
+function GlancesNavItem({ href, label, icon, isActive, glances, prefix, currentGlanceId }: GlancesNavItemProps) {
+  return (
+    <div className="glancenav-block">
+      <Link
+        href={href}
+        className={`navbarlink-row w-inline-block ${isActive ? 'w--current' : ''}`}
+      >
+        <div className="alignrow aligncenter">
+          <div className="navbarlink-icon">
+            <img
+              loading="lazy"
+              src={icon}
+              alt=""
+              className="navicon nonactive"
+              style={{ display: 'block' }}
+            />
+          </div>
+          <div>{label}</div>
+        </div>
+        <div className="activeindicator" style={{ display: isActive ? 'block' : 'none' }}></div>
+      </Link>
+      {glances.length > 0 && (
+        <div className="glancesdrawer">
+          {glances.map((glance) => {
+            const isGlanceActive = currentGlanceId === glance.id
+            return (
+              <Link
+                key={glance.id}
+                href={`${prefix}/glances/${glance.id}`}
+                className={`navbarlink-row w-inline-block ${isGlanceActive ? 'w--current' : ''}`}
+              >
+                <div className="alignrow aligncenter">
+                  <div className="navbarlink-icon">
+                    {glance.logo_url ? (
+                      <img src={glance.logo_url} loading="lazy" alt="" />
+                    ) : (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        width: '100%', 
+                        height: '100%', 
+                        fontSize: '12px', 
+                        fontWeight: 600, 
+                        color: '#7C3AED', 
+                        background: '#f3f0ff',
+                        borderRadius: '7px'
+                      }}>
+                        {glance.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div>{glance.name}</div>
+                </div>
+                <div className="activeindicator" style={{ display: isGlanceActive ? 'block' : 'none' }}></div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
