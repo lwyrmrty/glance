@@ -312,6 +312,9 @@
   border-radius: 10px;
   flex: none;
   height: 100px;
+  margin-top: -3px;
+  margin-left: -3px;
+  margin-right: -3px;
   margin-bottom: -15px;
   position: relative;
   overflow: hidden;

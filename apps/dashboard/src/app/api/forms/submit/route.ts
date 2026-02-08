@@ -52,6 +52,34 @@ export async function POST(request: NextRequest) {
     const webhookUrl = formTab?.form_webhook_url ?? ''
     const successMessage = formTab?.form_success_message ?? 'Thank you! Your submission has been received.'
 
+    // ---- Check for logged-in user via session token ----
+    const sessionToken = formData.get('_glance_session_token') as string | null
+    let loggedInUser: { email: string; first_name: string; last_name: string } | null = null
+
+    if (sessionToken) {
+      const { data: session } = await supabase
+        .from('widget_sessions')
+        .select('widget_user_id, expires_at')
+        .eq('token', sessionToken)
+        .single()
+
+      if (session && new Date(session.expires_at) > new Date()) {
+        const { data: user } = await supabase
+          .from('widget_users')
+          .select('email, first_name, last_name, workspace_id')
+          .eq('id', session.widget_user_id)
+          .single()
+
+        if (user && user.workspace_id === widget.workspace_id) {
+          loggedInUser = {
+            email: user.email,
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+          }
+        }
+      }
+    }
+
     // ---- Collect field values and handle file uploads ----
     const data: Record<string, string> = {}
     const fileUrls: Record<string, string> = {}
@@ -83,6 +111,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ---- Merge logged-in user data into submission ----
+    if (loggedInUser) {
+      data['_user_email'] = loggedInUser.email
+      data['_user_first_name'] = loggedInUser.first_name
+      data['_user_last_name'] = loggedInUser.last_name
+    }
+
     // ---- Fire webhook BEFORE insert (flat Zapier-compatible payload) ----
     let webhookStatus: number | null = null
     if (webhookUrl) {
@@ -93,6 +128,13 @@ export async function POST(request: NextRequest) {
           form_name: formName,
           widget_id: widgetId,
           submitted_at: new Date().toISOString(),
+        }
+
+        // Add logged-in user data to webhook payload
+        if (loggedInUser) {
+          webhookPayload['user_email'] = loggedInUser.email
+          webhookPayload['user_first_name'] = loggedInUser.first_name
+          webhookPayload['user_last_name'] = loggedInUser.last_name
         }
 
         for (const field of formFields) {
