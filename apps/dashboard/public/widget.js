@@ -1118,23 +1118,28 @@
 }
 `;/* Auth gate renderer for premium content */
 function G(l,e,s,p,c,widgetEl){
+  let auth=widgetEl&&widgetEl.config&&widgetEl.config.auth||{};
   let w=document.createElement("div");
   w.className="widget-content account";
   /* Banner */
-  if(l.tldr_banner_url){let bh=document.createElement("div");bh.className="tabhero no-pull";let bi=document.createElement("img");bi.src=l.tldr_banner_url;bi.loading="lazy";bi.className="full-image";bh.appendChild(bi);w.appendChild(bh)}
+  let bannerUrl=auth.banner_url||l.tldr_banner_url;
+  if(bannerUrl){let bh=document.createElement("div");bh.className="tabhero no-pull";let bi=document.createElement("img");bi.src=bannerUrl;bi.loading="lazy";bi.className="full-image";bh.appendChild(bi);w.appendChild(bh)}
   /* Heading */
   let hw=document.createElement("div");hw.className="tabheading-wrap center";
-  let hd=document.createElement("div");hd.className="tab-heading";hd.textContent="Premium Content";hw.appendChild(hd);
-  let hs=document.createElement("div");hs.className="tab-subheading";hs.textContent="Login or create your FREE account to access this content.";hw.appendChild(hs);
+  let hd=document.createElement("div");hd.className="tab-heading";hd.textContent=auth.title||"Premium Content";hw.appendChild(hd);
+  let hs=document.createElement("div");hs.className="tab-subheading";hs.textContent=auth.subtitle||"Login or create your FREE account to access this content.";hw.appendChild(hs);
   w.appendChild(hw);
   /* Form wrapper */
+  let showGoogle=auth.google_enabled!==false;
+  let showMagic=auth.magic_link_enabled!==false;
   let fw=document.createElement("div");fw.className="formcontent-wrap";
   /* ---- Default flow ---- */
   let df=document.createElement("form");df.className="formwrap loginwrap active-flow";df.setAttribute("account-flow","default");
   /* Google auth button */
+  if(showGoogle){
   let gb=document.createElement("div");
   let ga=document.createElement("a");ga.href="#";ga.className="google-auth-button w-inline-block";
-  let gi=document.createElement("img");gi.src="/images/adTFhODz_400x400.jpg";gi.loading="lazy";gi.className="google-icon";ga.appendChild(gi);
+  let gi=document.createElement("img");gi.src=c+"/images/adTFhODz_400x400.jpg";gi.loading="lazy";gi.className="google-icon";ga.appendChild(gi);
   let gt=document.createElement("div");gt.textContent="Continue with Google";ga.appendChild(gt);
   ga.addEventListener("click",ev=>{ev.preventDefault();
     let popup=window.open(c+"/api/widget-auth/google?widget_id="+s,"glance_google_auth","width=500,height=600,scrollbars=yes");
@@ -1147,14 +1152,18 @@ function G(l,e,s,p,c,widgetEl){
     })
   });
   gb.appendChild(ga);df.appendChild(gb);
+  }
   /* Divider */
+  if(showGoogle&&showMagic){
   let dv=document.createElement("div");dv.className="formfield-block";
   let dr=document.createElement("div");dr.className="labelrow";
   let dd1=document.createElement("div");dd1.className="labeldivider";dr.appendChild(dd1);
   let dl=document.createElement("div");dl.className="formlabel smalldim";dl.textContent="Or Use Magical Link";dr.appendChild(dl);
   let dd2=document.createElement("div");dd2.className="labeldivider";dr.appendChild(dd2);
   dv.appendChild(dr);df.appendChild(dv);
+  }
   /* Email input */
+  if(showMagic){
   let ef=document.createElement("div");ef.className="formfield-block";
   let er=document.createElement("div");er.className="labelrow";
   let el=document.createElement("div");el.className="formlabel";el.textContent="Email Address";er.appendChild(el);
@@ -1181,7 +1190,10 @@ function G(l,e,s,p,c,widgetEl){
     }catch(err){errDiv.textContent="Something went wrong. Please try again.";errDiv.style.display="block"}
     finally{sb.disabled=!1;sb.value="Send Magic Code"}
   });
-  df.appendChild(sb);fw.appendChild(df);
+  df.appendChild(sb);
+  }
+  fw.appendChild(df);
+  if(showMagic){
   /* ---- Magic Create flow (new user) ---- */
   let mc=document.createElement("form");mc.className="formwrap loginwrap";mc.setAttribute("account-flow","magic-create");
   let mch=document.createElement("div");mch.className="tabheading-wrap center";
@@ -1272,6 +1284,7 @@ function G(l,e,s,p,c,widgetEl){
     }catch(err){mlErr.textContent="Something went wrong. Please try again.";mlErr.style.display="block";mlBtn.disabled=!1;mlBtn.value="Login"}
   });
   ml.appendChild(mlBtn);fw.appendChild(ml);
+  }
   w.appendChild(fw);e.appendChild(w);
   return null
 }

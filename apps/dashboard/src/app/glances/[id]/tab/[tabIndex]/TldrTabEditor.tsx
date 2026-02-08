@@ -185,36 +185,6 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                 )}
               </div>
 
-              {/* Logo Image (TLDR only, not Content) */}
-              {!isContentTab && (
-                <div className="fieldblocks">
-                  <div className="labelrow">
-                    <div className="labeltext">Logo Image</div>
-                    <div className="labeldivider"></div>
-                  </div>
-                  <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
-                  {tldrLogoPreview && (
-                    <div className="stylefield-block" style={{ justifyContent: 'flex-start' }}>
-                      <div className="thumbnailpreview square">
-                        <img src={tldrLogoPreview} alt="" className="fullimage" />
-                      </div>
-                      <div>
-                        <div className="uploadtitle">Logo image</div>
-                        <div className="uploadactions">
-                          <a href="#" className="deletelink" onClick={(e) => { e.preventDefault(); setTldrLogoPreview(null); logoFileRef.current = null }}>Delete</a>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {!tldrLogoPreview && (
-                    <div className="uploadcard" style={{ cursor: 'pointer' }} onClick={() => logoInputRef.current?.click()}>
-                      {uploadIconSvg}
-                      <div>Upload Image</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Title */}
               <div className="fieldblocks">
                 <div className="labelrow">
@@ -397,18 +367,9 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
           Banner Image
         </div>
       )}
-      {/* Logo + Name Block */}
+      {/* Name Block */}
       <div className="course-logo-block">
         <div className="logo-row">
-          {tldrLogoPreview ? (
-            <div className="widget-logo">
-              <img src={tldrLogoPreview} alt="" className="full-image" loading="lazy" />
-            </div>
-          ) : (
-            <div className="widget-logo" style={{ background: '#e8e8e8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 9 }}>
-              Logo
-            </div>
-          )}
           <div className="widget-name-block">
             <div className="widget-name">{tldrTitle || 'Title'}</div>
             <div className="widget-subname">{tldrSubtitle || 'Subtitle'}</div>
