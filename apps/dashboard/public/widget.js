@@ -211,13 +211,13 @@
 @media (max-width: 500px) {
   .glancewrapper { right: 8px; bottom: 8px; gap: 6px; }
   .glance-panel { right: 8px; bottom: 62px; left: 8px; }
-  .glancewidget { width: 100%; max-height: calc(100dvh - 70px); }
+  .glancewidget { width: 100%; height: calc(100dvh - 70px); }
   .glancewidget-tabs { flex: 1; height: auto; min-height: 0; max-height: none; }
 }
 @media (max-height: 700px) {
   .glancewrapper { bottom: 8px; gap: 6px; }
   .glance-panel { bottom: 62px; }
-  .glancewidget { max-height: calc(100dvh - 70px); }
+  .glancewidget { height: calc(100dvh - 70px); }
   .glancewidget-tabs { flex: 1; height: auto; min-height: 0; max-height: none; }
 }
 
