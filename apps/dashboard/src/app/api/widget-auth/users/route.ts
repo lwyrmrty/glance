@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -8,12 +9,15 @@ import { NextRequest, NextResponse } from 'next/server'
  * Requires dashboard authentication.
  */
 export async function GET(request: NextRequest) {
-  const supabase = createAdminClient()
-
-  const { data: authData, error: authError } = await supabase.auth.getClaims()
+  // Use server client for auth (reads user cookies)
+  const authClient = await createClient()
+  const { data: authData, error: authError } = await authClient.auth.getClaims()
   if (authError || !authData?.claims) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // Use admin client for data queries (bypasses RLS)
+  const supabase = createAdminClient()
 
   const workspaceId = request.nextUrl.searchParams.get('workspace_id')
   if (!workspaceId) {
@@ -70,12 +74,15 @@ export async function GET(request: NextRequest) {
  * Requires dashboard authentication.
  */
 export async function DELETE(request: NextRequest) {
-  const supabase = createAdminClient()
-
-  const { data: authData, error: authError } = await supabase.auth.getClaims()
+  // Use server client for auth (reads user cookies)
+  const authClient = await createClient()
+  const { data: authData, error: authError } = await authClient.auth.getClaims()
   if (authError || !authData?.claims) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // Use admin client for data queries (bypasses RLS)
+  const supabase = createAdminClient()
 
   try {
     const { ids } = await request.json()
