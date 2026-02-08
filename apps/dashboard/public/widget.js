@@ -207,6 +207,19 @@
   box-shadow: 0 0 5px 2px #0000002e;
 }
 
+/* ---- Mobile Responsive ---- */
+@media (max-width: 500px) {
+  .glancewrapper { right: 8px; bottom: 8px; gap: 6px; }
+  .glance-panel { right: 8px; bottom: 62px; left: 8px; }
+  .glancewidget { width: 100%; }
+  .glancewidget-tabs { height: calc(100dvh - 90px); min-height: 0; max-height: none; }
+}
+@media (max-height: 700px) {
+  .glancewrapper { bottom: 8px; gap: 6px; }
+  .glance-panel { bottom: 62px; }
+  .glancewidget-tabs { height: calc(100dvh - 90px); min-height: 0; max-height: none; }
+}
+
 /* ---- Tab Navigation ---- */
 
 .glancewidget-tab-nav {
