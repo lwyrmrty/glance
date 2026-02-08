@@ -1,5 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest } from 'next/server'
+
+// CORS headers — the widget calls this from external sites
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders })
+}
 
 // ============================================
 // POST /api/chat — RAG chat endpoint (streaming)
@@ -7,16 +18,7 @@ import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Auth check
-    const { data: authData, error: authError } = await supabase.auth.getClaims()
-    if (authError || !authData?.claims) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
+    const supabase = createAdminClient()
 
     const body = await request.json()
     const { widgetId, tabIndex, message, history = [] } = body
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!widgetId || tabIndex === undefined || !message) {
       return new Response(JSON.stringify({ error: 'Missing required fields: widgetId, tabIndex, message' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     }
 
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (widgetError || !widget) {
       return new Response(JSON.stringify({ error: 'Widget not found' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     }
 
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!tab) {
       return new Response(JSON.stringify({ error: 'Tab not found' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     }
 
@@ -103,7 +105,7 @@ export async function POST(request: NextRequest) {
     if (!apiKey) {
       return new Response(JSON.stringify({ error: 'OPENAI_API_KEY is not configured' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     }
 
@@ -137,7 +139,7 @@ export async function POST(request: NextRequest) {
       console.error('Embedding error:', errText)
       return new Response(JSON.stringify({ error: 'Failed to embed query' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     }
 
@@ -405,7 +407,7 @@ NEVER fill gaps with information from your training data.`
       console.error('OpenAI chat error:', errText)
       return new Response(JSON.stringify({ error: 'Failed to generate response' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     }
 
@@ -465,13 +467,14 @@ NEVER fill gaps with information from your training data.`
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        ...corsHeaders,
       },
     })
   } catch (error) {
     console.error('Chat API error:', error)
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
     })
   }
 }

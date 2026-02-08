@@ -13,7 +13,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - images (public images)
+     * - api/ (API routes handle their own auth / CORS)
+     * - widget.js / widget.css (public widget assets)
      */
-    '/((?!_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images|api/|widget\\.js|widget\\.css|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
