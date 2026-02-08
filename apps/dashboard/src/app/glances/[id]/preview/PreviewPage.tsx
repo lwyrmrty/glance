@@ -6,7 +6,7 @@ import { useRef, useEffect, useState } from 'react'
 
 interface Glance {
   id: string
-  account_id: string
+  workspace_id: string
   name: string
   logo_url: string | null
   domain: string | null
@@ -20,9 +20,11 @@ interface Glance {
 
 interface PreviewPageProps {
   glance: Glance
+  workspaceId?: string
 }
 
-export function PreviewPage({ glance }: PreviewPageProps) {
+export function PreviewPage({ glance, workspaceId }: PreviewPageProps) {
+  const prefix = workspaceId ? `/w/${workspaceId}` : ''
   const containerRef = useRef<HTMLDivElement>(null)
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const widgetRef = useRef<HTMLElement | null>(null)
@@ -78,7 +80,7 @@ export function PreviewPage({ glance }: PreviewPageProps) {
         color: '#666',
       }}>
         <Link
-          href={`/glances/${glance.id}`}
+          href={`${prefix}/glances/${glance.id}`}
           style={{ color: glance.theme_color, textDecoration: 'none', fontWeight: 500 }}
         >
           ← Back to Editor

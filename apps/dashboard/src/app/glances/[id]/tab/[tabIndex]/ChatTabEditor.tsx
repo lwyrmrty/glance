@@ -9,7 +9,8 @@ interface ChatTabHookProps extends TabHookProps {
   knowledgeSources: KnowledgeSourceSummary[]
 }
 
-export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, knowledgeSources }: ChatTabHookProps): TabHookResult {
+export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, knowledgeSources, workspaceId }: ChatTabHookProps): TabHookResult {
+  const knowledgePrefix = workspaceId ? `/w/${workspaceId}` : ''
   // Saved values for change detection
   const savedWelcome = tab.welcome_message ?? ''
   const savedDirective = tab.directive ?? ''
@@ -319,7 +320,7 @@ export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                       </div>
                     </div>
                     <div className="spacer10"></div>
-                    <Link href="/knowledge" className="bulkaction-button w-inline-block" style={{ display: 'inline-flex' }}>
+                    <Link href={`${knowledgePrefix}/knowledge`} className="bulkaction-button w-inline-block" style={{ display: 'inline-flex' }}>
                       <div>Manage Knowledge Sources</div>
                     </Link>
                   </>
@@ -329,7 +330,7 @@ export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                       <div className="emptystate-heading">No knowledge sources yet.</div>
                       <div className="emptystate-subheading">Add knowledge sources to power this chat tab with relevant context.</div>
                     </div>
-                    <Link href="/knowledge" className="button outline w-inline-block">
+                    <Link href={`${knowledgePrefix}/knowledge`} className="button outline w-inline-block">
                       <div>Manage Knowledge Sources</div>
                     </Link>
                   </div>

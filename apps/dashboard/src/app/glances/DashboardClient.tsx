@@ -5,9 +5,12 @@ import Sidebar from '@/components/Sidebar'
 
 interface DashboardClientProps {
   glances: any[]
+  workspaceName?: string
+  workspaceId?: string
 }
 
-export default function DashboardClient({ glances }: DashboardClientProps) {
+export default function DashboardClient({ glances, workspaceName, workspaceId }: DashboardClientProps) {
+  const prefix = workspaceId ? `/w/${workspaceId}` : ''
   const tabCount = (glance: any) => {
     const tabs = (glance.button_style as any)?.tabs ?? []
     return tabs.filter((t: any) => t.name?.trim()).length
@@ -16,7 +19,7 @@ export default function DashboardClient({ glances }: DashboardClientProps) {
   return (
     <div className="pagewrapper">
       <div className="pagecontent">
-        <Sidebar />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
 
         {/* Main Content Area */}
         <div className="mainwrapper padd">
@@ -63,7 +66,7 @@ export default function DashboardClient({ glances }: DashboardClientProps) {
                             </div>
                             <div className="tablerow-right">
                               <div className="tableblock right">
-                                <Link href={`/glances/${glance.id}`} className="tablebutton w-inline-block">
+                                <Link href={`${prefix}/glances/${glance.id}`} className="tablebutton w-inline-block">
                                   <div>View / Edit</div>
                                 </Link>
                               </div>
@@ -73,7 +76,7 @@ export default function DashboardClient({ glances }: DashboardClientProps) {
                       </div>
                     </div>
                     <div className="spacer20"></div>
-                    <Link href="/glances/new" className="button outline w-inline-block">
+                    <Link href={`${prefix}/glances/new`} className="button outline w-inline-block">
                       <div>Create New Glance</div>
                     </Link>
                   </div>
@@ -83,7 +86,7 @@ export default function DashboardClient({ glances }: DashboardClientProps) {
                       <div className="emptystate-heading">No Glances created yet.</div>
                       <div className="emptystate-subheading">The magic awaits...</div>
                     </div>
-                    <Link href="/glances/new" className="button outline w-inline-block">
+                    <Link href={`${prefix}/glances/new`} className="button outline w-inline-block">
                       <div>Create your first Glance</div>
                     </Link>
                   </div>

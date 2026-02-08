@@ -66,6 +66,7 @@ export interface TabHookProps {
   glanceName: string
   themeColor: string
   tabs: any[]
+  workspaceId?: string
   /** Called by sub-editor when it computes its save payload */
   onSave: (payload: Record<string, any>) => Promise<void>
   saving: boolean

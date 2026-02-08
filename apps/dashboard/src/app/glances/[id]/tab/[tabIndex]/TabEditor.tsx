@@ -16,9 +16,12 @@ interface TabEditorProps {
   tabIndex: number
   glance: Record<string, unknown>
   knowledgeSources?: KnowledgeSourceSummary[]
+  workspaceName?: string
+  workspaceId?: string
 }
 
-export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources = [] }: TabEditorProps) {
+export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources = [], workspaceName, workspaceId }: TabEditorProps) {
+  const prefix = workspaceId ? `/w/${workspaceId}` : ''
   const router = useRouter()
   const { showToast } = useToast()
 
@@ -85,7 +88,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   }
 
   // ===== Call all three hooks unconditionally (React hooks rules) =====
-  const hookProps = { tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving }
+  const hookProps = { tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, workspaceId }
 
   const chatTab = useChatTab({ ...hookProps, knowledgeSources })
   const formTab = useFormTab(hookProps)
@@ -113,7 +116,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   return (
     <div className="pagewrapper" style={{ '--vcs-purple': themeColor } as React.CSSProperties}>
       <div className="pagecontent">
-        <Sidebar />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
 
         <div className="mainwrapper">
           <div className="maincontent flex">
@@ -122,9 +125,9 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
               <div className="innerhero">
                 {/* Breadcrumb */}
                 <div className="innerbreadcrumb-row">
-                  <Link href="/glances" className="innerbreadcrumb-link">Glances</Link>
+                  <Link href={`${prefix}/glances`} className="innerbreadcrumb-link">Glances</Link>
                   <div className="innerbreadcrumb-divider">/</div>
-                  <Link href={`/glances/${glanceId}`} className="innerbreadcrumb-link">{glanceName}</Link>
+                  <Link href={`${prefix}/glances/${glanceId}`} className="innerbreadcrumb-link">{glanceName}</Link>
                   <div className="innerbreadcrumb-divider">/</div>
                   <span className="innerbreadcrumb-link w--current">{tabName} ({tabType})</span>
                 </div>
@@ -326,6 +329,27 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
 
             {/* ===== RIGHT SIDE: Demo Preview — hidden in submissions view ===== */}
             {!isSubmissionsView && <div className="demoside downflex">
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                background: '#fff',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                fontSize: '13px',
+                color: '#666',
+                marginBottom: '12px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+              }}>
+                <Link
+                  href={`${prefix}/glances/${glanceId}/preview`}
+                  className="preview-link-hover"
+                  style={{ color: themeColor, textDecoration: 'none', fontWeight: 500, opacity: 0.5, transition: 'opacity 0.15s' }}
+                >
+                  View Preview
+                </Link>
+              </div>
               <div className="_25-col center-fill-copy">
                 <div className="glancewidget">
                   <div className="glancewidget-tabs" style={{ position: 'relative' }}>
@@ -338,7 +362,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
                       return (
                         <Link
                           key={i}
-                          href={`/glances/${glanceId}/tab/${originalIndex}`}
+                          href={`${prefix}/glances/${glanceId}/tab/${originalIndex}`}
                           className={`glancewidget-tablink${i === 0 ? ' first' : ''}${i === filtered.length - 1 ? ' last' : ''}${t.name === tab.name ? ' active' : ''} w-inline-block`}
                         >
                           <img loading="lazy" src={t.icon || '/images/Chats.svg'} alt="" className="tldrwidget-icon sm" />

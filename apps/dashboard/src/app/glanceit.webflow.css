@@ -159,6 +159,20 @@ em {
   font-weight: 400;
 }
 
+.button.lite {
+  border: 1.5px solid var(--admin-border);
+  color: var(--dark);
+  text-shadow: none;
+  background-color: #f1f1f1;
+  font-size: 15.55px;
+}
+
+.button.lite:hover {
+  border-color: var(--dark);
+  background-color: var(--black);
+  color: var(--white);
+}
+
 .hero-slide {
   aspect-ratio: 3 / 4;
   vertical-align: bottom;
@@ -976,7 +990,7 @@ em {
   border-radius: 10px;
   justify-content: space-between;
   align-items: center;
-  padding: 4px;
+  padding: 4px 7px 4px 4px;
   font-weight: 500;
   line-height: 1rem;
   text-decoration: none;
@@ -3812,4 +3826,123 @@ button:disabled,
 
 .preview-link-hover:hover {
   opacity: 1 !important;
+}
+
+.workspacerow {
+  flex-flow: column;
+  margin-left: -5px;
+  margin-right: -5px;
+  display: flex;
+}
+
+.workspaceitem {
+  width: 100%;
+  padding: 5px;
+}
+
+.workspacecard {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  border: 1.5px solid var(--admin-border);
+  border-radius: 10px;
+  flex-flow: column;
+  padding: 10px;
+  display: flex;
+}
+
+.workspacebanner {
+  background-color: var(--dark);
+  border-radius: 10px;
+  height: 70px;
+  position: relative;
+  overflow: hidden;
+}
+
+.workspacelogo-row {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  justify-content: flex-start;
+  align-items: center;
+  display: flex;
+}
+
+.workspaceicon {
+  border: 1.5px solid #fff;
+  border-radius: 10px;
+  flex: none;
+  width: 73px;
+  height: 73px;
+  position: relative;
+  overflow: hidden;
+}
+
+.glancerow {
+  grid-column-gap: 10px;
+  grid-row-gap: 10px;
+  border: 1.5px solid var(--admin-border);
+  border-radius: 10px;
+  flex: 1;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 5px;
+  display: flex;
+}
+
+.glancerow:hover {
+  border-color: var(--dark);
+}
+
+.glanceicon {
+  border-radius: 10px;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  position: relative;
+  overflow: hidden;
+}
+
+.workspacetitle {
+  margin-top: 10px;
+  font-size: 21px;
+  font-weight: 500;
+}
+
+.workspacesubtitle {
+  opacity: .5;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.glancetitle {
+  margin-top: 1px;
+  font-weight: 500;
+}
+
+.glancesubtitle {
+  opacity: .5;
+  margin-top: 2px;
+  font-size: 13.7px;
+  font-weight: 500;
+  line-height: 1.2em;
+}
+
+.glancesrow {
+  grid-column-gap: 5px;
+  grid-row-gap: 5px;
+  flex-flow: row;
+  flex-wrap: wrap;
+  display: flex;
+}
+
+.workspacerows {
+  justify-content: space-between;
+  align-items: center;
+  display: flex;
+}
+
+.divider {
+  background-color: var(--admin-border);
+  height: 1.5px;
+  margin-top: 10px;
+  margin-bottom: 10px;
 }

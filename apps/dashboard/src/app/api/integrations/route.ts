@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
+import { getActiveWorkspace } from '@/lib/workspace'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ============================================
-// GET /api/integrations — Fetch integration status for the user's account
+// GET /api/integrations — Fetch integration status for the user's workspace
 // ============================================
 
 export async function GET() {
@@ -14,29 +15,24 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: membership } = await supabase
-      .from('account_memberships')
-      .select('account_id')
-      .eq('user_id', authData.claims.sub)
-      .single()
-
-    if (!membership) {
-      return NextResponse.json({ error: 'No account found' }, { status: 400 })
+    const activeWorkspace = await getActiveWorkspace(supabase, authData.claims.sub)
+    if (!activeWorkspace) {
+      return NextResponse.json({ error: 'No workspace found' }, { status: 400 })
     }
 
-    const { data: account } = await supabase
-      .from('accounts')
+    const { data: wsData } = await supabase
+      .from('workspaces')
       .select('airtable_api_key')
-      .eq('id', membership.account_id)
+      .eq('id', activeWorkspace.workspace_id)
       .single()
 
     return NextResponse.json({
-      accountId: membership.account_id,
+      workspaceId: activeWorkspace.workspace_id,
       airtable: {
-        connected: !!account?.airtable_api_key,
+        connected: !!wsData?.airtable_api_key,
         // Only send a masked version of the key, never the full key
-        keyHint: account?.airtable_api_key
-          ? account.airtable_api_key.slice(0, 6) + '...' + account.airtable_api_key.slice(-4)
+        keyHint: wsData?.airtable_api_key
+          ? wsData.airtable_api_key.slice(0, 6) + '...' + wsData.airtable_api_key.slice(-4)
           : null,
       },
     })
@@ -59,14 +55,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: membership } = await supabase
-      .from('account_memberships')
-      .select('account_id')
-      .eq('user_id', authData.claims.sub)
-      .single()
-
-    if (!membership) {
-      return NextResponse.json({ error: 'No account found' }, { status: 400 })
+    const activeWorkspace = await getActiveWorkspace(supabase, authData.claims.sub)
+    if (!activeWorkspace) {
+      return NextResponse.json({ error: 'No workspace found' }, { status: 400 })
     }
 
     const body = await request.json()
@@ -91,12 +82,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { error: updateError } = await supabase
-      .from('accounts')
+      .from('workspaces')
       .update({
         airtable_api_key: airtableApiKey || null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', membership.account_id)
+      .eq('id', activeWorkspace.workspace_id)
 
     if (updateError) {
       return NextResponse.json(

@@ -9,7 +9,7 @@ import { useToast } from '@/components/Toast'
 
 interface Glance {
   id: string
-  account_id: string
+  workspace_id: string
   name: string
   logo_url: string | null
   domain: string | null
@@ -23,14 +23,16 @@ interface Glance {
 
 interface GlanceEditorProps {
   glanceId: string
-  accountId?: string
+  workspaceId?: string
+  workspaceName?: string
   glance?: Glance | null
 }
 
-export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEditorProps) {
+export default function GlanceEditor({ glanceId, workspaceId, workspaceName, glance }: GlanceEditorProps) {
   const isNew = glanceId === 'new'
   const router = useRouter()
   const { showToast } = useToast()
+  const prefix = workspaceId ? `/w/${workspaceId}` : ''
   const [name, setName] = useState(glance?.name ?? '')
   const [saving, setSaving] = useState(false)
   const [logoFile, setLogoFile] = useState<File | null>(null)
@@ -215,9 +217,9 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     let logoUrl = glance.logo_url
 
     // Upload new logo if changed
-    if (logoFile && accountId) {
+    if (logoFile && workspaceId) {
       const fileExt = logoFile.name.split('.').pop()
-      const filePath = `${accountId}/${Date.now()}.${fileExt}`
+      const filePath = `${workspaceId}/${Date.now()}.${fileExt}`
       const { error: uploadError } = await supabase.storage
         .from('logos')
         .upload(filePath, logoFile)
@@ -231,9 +233,9 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     }
 
     // Upload new widget icon if changed
-    if (widgetIconFile && accountId) {
+    if (widgetIconFile && workspaceId) {
       const fileExt = widgetIconFile.name.split('.').pop()
-      const filePath = `${accountId}/widget-icon-${Date.now()}.${fileExt}`
+      const filePath = `${workspaceId}/widget-icon-${Date.now()}.${fileExt}`
       const { error: uploadError } = await supabase.storage
         .from('logos')
         .upload(filePath, widgetIconFile)
@@ -250,9 +252,9 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     const resolvedTabs = await Promise.all(
       tabs.map(async (tab, i) => {
         const file = tabIconFiles[i]
-        if (!file || !accountId) return tab
+        if (!file || !workspaceId) return tab
         const fileExt = file.name.split('.').pop()
-        const filePath = `${accountId}/tab-icon-${Date.now()}-${i}.${fileExt}`
+        const filePath = `${workspaceId}/tab-icon-${Date.now()}-${i}.${fileExt}`
         const { error: uploadError } = await supabase.storage
           .from('logos')
           .upload(filePath, file)
@@ -308,7 +310,7 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
   }
 
   const handleCreate = async () => {
-    if (!name.trim() || !accountId) return
+    if (!name.trim() || !workspaceId) return
     setSaving(true)
 
     const supabase = createClient()
@@ -317,7 +319,7 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     // Upload logo if provided
     if (logoFile) {
       const fileExt = logoFile.name.split('.').pop()
-      const filePath = `${accountId}/${Date.now()}.${fileExt}`
+      const filePath = `${workspaceId}/${Date.now()}.${fileExt}`
       const { error: uploadError } = await supabase.storage
         .from('logos')
         .upload(filePath, logoFile)
@@ -333,7 +335,7 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     const { data, error } = await supabase
       .from('widgets')
       .insert({
-        account_id: accountId,
+        workspace_id: workspaceId,
         name: name.trim(),
         logo_url: logoUrl,
       })
@@ -348,20 +350,20 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
     }
 
     showToast('Glance created successfully!')
-    router.push(`/glances/${data.id}`)
+    router.push(`${prefix}/glances/${data.id}`)
   }
 
   return (
     <div className="pagewrapper" style={{ '--vcs-purple': themeColor } as React.CSSProperties}>
       <div className="pagecontent">
-        <Sidebar />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
 
         <div className="mainwrapper">
           <div className="maincontent flex">
             <div className="textside">
               <div className="innerhero">
                 <div className="innerbreadcrumb-row">
-                  <Link href="/glances" className="innerbreadcrumb-link">Glances</Link>
+                  <Link href={`${prefix}/glances`} className="innerbreadcrumb-link">Glances</Link>
                   <div className="innerbreadcrumb-divider">/</div>
                   <a href="#" className="innerbreadcrumb-link active">{isNew ? 'New Glance' : name}</a>
                 </div>
@@ -388,7 +390,7 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                     <a href="#" className="innerhero-nav-link w-inline-block">
                       <div>Embed</div>
                     </a>
-                    <Link href={`/glances/${glanceId}/preview`} className="innerhero-nav-link w-inline-block">
+                    <Link href={`${prefix}/glances/${glanceId}/preview`} className="innerhero-nav-link w-inline-block">
                       <div>Preview</div>
                     </Link>
                   </div>
@@ -553,7 +555,7 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
                                 )}
                               </div>
                               <div className="rowcard-actions">
-                                <Link href={tab.type ? `/glances/${glanceId}/tab/${index}` : '#'} className={`tablebutton square w-inline-block${!tab.type ? ' disabled' : ''}`} onClick={!tab.type ? (e: React.MouseEvent) => e.preventDefault() : undefined}>
+                                <Link href={tab.type ? `${prefix}/glances/${glanceId}/tab/${index}` : '#'} className={`tablebutton square w-inline-block${!tab.type ? ' disabled' : ''}`} onClick={!tab.type ? (e: React.MouseEvent) => e.preventDefault() : undefined}>
                                   <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="go-arrow">
                                     <g>
                                       <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
@@ -755,6 +757,29 @@ export default function GlanceEditor({ glanceId, accountId, glance }: GlanceEdit
 
             {/* Demo / Preview Side */}
             <div className="demoside downflex">
+              {!isNew && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 14px',
+                  background: '#fff',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  color: '#666',
+                  marginBottom: '12px',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                }}>
+                  <Link
+                    href={`${prefix}/glances/${glanceId}/preview`}
+                    className="preview-link-hover"
+                    style={{ color: themeColor, textDecoration: 'none', fontWeight: 500, opacity: 0.5, transition: 'opacity 0.15s' }}
+                  >
+                    View Preview
+                  </Link>
+                </div>
+              )}
               {isNew ? (
                 <img 
                   src="/images/litebgoption.webp" 

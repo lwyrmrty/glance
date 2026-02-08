@@ -28,10 +28,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch the widget to get account_id, form config, and webhook URL
+    // Fetch the widget to get workspace_id, form config, and webhook URL
     const { data: widget, error: widgetError } = await supabase
       .from('widgets')
-      .select('id, account_id, button_style')
+      .select('id, workspace_id, button_style')
       .eq('id', widgetId)
       .single()
 
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await supabase
       .from('form_submissions')
       .insert({
-        account_id: widget.account_id,
+        workspace_id: widget.workspace_id,
         widget_id: widgetId,
         form_name: formName,
         data,

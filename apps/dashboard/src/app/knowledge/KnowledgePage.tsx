@@ -34,7 +34,7 @@ type PanelView = 'empty' | 'edit' | 'create' | 'create-form'
 // DB source shape
 interface KnowledgeSourceRecord {
   id: string
-  account_id: string
+  workspace_id: string
   name: string
   type: string
   config: Record<string, unknown>
@@ -62,9 +62,11 @@ const sourceTypeIcons: Record<string, string> = {
 
 interface KnowledgePageProps {
   initialSources?: KnowledgeSourceRecord[]
+  workspaceName?: string
+  workspaceId?: string
 }
 
-export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
+export function KnowledgePage({ initialSources = [], workspaceName, workspaceId }: KnowledgePageProps) {
   const { showToast } = useToast()
   const [panelView, setPanelView] = useState<PanelView>('empty')
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>(initialSources)
@@ -400,7 +402,7 @@ export function KnowledgePage({ initialSources = [] }: KnowledgePageProps) {
   return (
     <div className="pagewrapper">
       <div className="pagecontent">
-        <Sidebar />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
 
         <div className="mainwrapper padd">
           <div className="maincontent flex">

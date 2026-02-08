@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import DashboardClient from './DashboardClient'
+import { getActiveWorkspace } from '@/lib/workspace'
 
-export default async function DashboardPage() {
+// Legacy route — redirects to /w/{workspaceId}/glances
+export default async function LegacyDashboardPage() {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
 
@@ -10,11 +11,10 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Fetch all glances for this account
-  const { data: glances } = await supabase
-    .from('widgets')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const workspace = await getActiveWorkspace(supabase, data.claims.sub)
+  if (!workspace) {
+    redirect('/')
+  }
 
-  return <DashboardClient glances={glances ?? []} />
+  redirect(`/w/${workspace.workspace_id}/glances`)
 }

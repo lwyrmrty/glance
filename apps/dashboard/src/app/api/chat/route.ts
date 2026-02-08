@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     const tabs = (widget.button_style as any)?.tabs ?? []
     const tab = tabs[tabIndex]
-    console.log(`[Glance Chat] Widget account_id: ${widget.account_id}, tabIndex: ${tabIndex}, tab type: ${tab?.type}`)
+    console.log(`[Glance Chat] Widget workspace_id: ${widget.workspace_id}, tabIndex: ${tabIndex}, tab type: ${tab?.type}`)
 
     if (!tab) {
       return new Response(JSON.stringify({ error: 'Tab not found' }), {
@@ -68,12 +68,12 @@ export async function POST(request: NextRequest) {
       const { data: allSources } = await supabase
         .from('knowledge_sources')
         .select('id')
-        .eq('account_id', widget.account_id)
+        .eq('workspace_id', widget.workspace_id)
         .eq('sync_status', 'synced')
       
       if (allSources && allSources.length > 0) {
         knowledgeSourceIds = allSources.map((s: { id: string }) => s.id)
-        console.log(`[Glance Chat] Using ${knowledgeSourceIds.length} account-level knowledge sources as fallback`)
+        console.log(`[Glance Chat] Using ${knowledgeSourceIds.length} workspace-level knowledge sources as fallback`)
       }
     }
 

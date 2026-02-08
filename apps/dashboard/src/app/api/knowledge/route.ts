@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getActiveWorkspace } from '@/lib/workspace'
 import { NextRequest, NextResponse } from 'next/server'
 import * as cheerio from 'cheerio'
 
@@ -736,16 +737,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's account
-    const { data: membership } = await supabase
-      .from('account_memberships')
-      .select('account_id')
-      .eq('user_id', authData.claims.sub)
-      .single()
-
-    if (!membership) {
-      return NextResponse.json({ error: 'No account found' }, { status: 400 })
+    // Get active workspace
+    const workspace = await getActiveWorkspace(supabase, authData.claims.sub)
+    if (!workspace) {
+      return NextResponse.json({ error: 'No workspace found' }, { status: 400 })
     }
+    const membership = { workspace_id: workspace.workspace_id }
 
     // Parse request body
     const body = await request.json()
@@ -824,7 +821,7 @@ export async function POST(request: NextRequest) {
 
     // Create the knowledge source record (syncing state)
     const insertPayload: Record<string, unknown> = {
-      account_id: membership.account_id,
+      workspace_id: membership.workspace_id,
       name: 'Syncing...',
       type,
       config,
@@ -858,17 +855,17 @@ export async function POST(request: NextRequest) {
         content = await fetchGoogleSheetContent(resourceId!)
       } else if (type === 'airtable_table') {
         // Fetch the Airtable API key from the account
-        const { data: account } = await supabase
-          .from('accounts')
+        const { data: workspace } = await supabase
+          .from('workspaces')
           .select('airtable_api_key')
-          .eq('id', membership.account_id)
+          .eq('id', membership.workspace_id)
           .single()
 
-        if (!account?.airtable_api_key) {
+        if (!workspace?.airtable_api_key) {
           throw new Error('Airtable is not connected. Add your API key in Integrations.')
         }
 
-        content = await fetchAirtableContent(baseId, tableId, account.airtable_api_key, viewId, body.selectedFields)
+        content = await fetchAirtableContent(baseId, tableId, workspace.airtable_api_key, viewId, body.selectedFields)
       } else if (type === 'markdown') {
         content = mdContent
       } else if (type === 'website') {
@@ -1091,24 +1088,21 @@ export async function PUT(request: NextRequest) {
       } else if (type === 'google_sheet') {
         content = await fetchGoogleSheetContent(resourceId!)
       } else if (type === 'airtable_table') {
-        // Get the API key from the account
-        const { data: membership } = await supabase
-          .from('account_memberships')
-          .select('account_id')
-          .eq('user_id', (await supabase.auth.getClaims()).data?.claims?.sub)
-          .single()
+        // Get the API key from the workspace
+        const resyncWorkspace = await getActiveWorkspace(supabase, (await supabase.auth.getClaims()).data?.claims?.sub ?? '')
+        const membership = resyncWorkspace ? { workspace_id: resyncWorkspace.workspace_id } : null
 
-        const { data: account } = await supabase
-          .from('accounts')
+        const { data: wsData } = await supabase
+          .from('workspaces')
           .select('airtable_api_key')
-          .eq('id', membership?.account_id)
+          .eq('id', membership?.workspace_id)
           .single()
 
-        if (!account?.airtable_api_key) {
+        if (!wsData?.airtable_api_key) {
           throw new Error('Airtable is not connected. Add your API key in Integrations.')
         }
 
-        content = await fetchAirtableContent(typedConfig.baseId, typedConfig.tableId, account.airtable_api_key, typedConfig.viewId, typedConfig.selectedFields)
+        content = await fetchAirtableContent(typedConfig.baseId, typedConfig.tableId, wsData.airtable_api_key, typedConfig.viewId, typedConfig.selectedFields)
       } else if (type === 'markdown') {
         // Markdown content is stored directly — re-chunk from stored content
         content = source.content

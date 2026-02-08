@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import KnowledgePage from './KnowledgePage'
+import { getActiveWorkspace } from '@/lib/workspace'
 
-export default async function KnowledgeRoute() {
+// Legacy route — redirects to /w/{workspaceId}/knowledge
+export default async function LegacyKnowledgeRoute() {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
 
@@ -10,11 +11,10 @@ export default async function KnowledgeRoute() {
     redirect('/login')
   }
 
-  // Fetch existing knowledge sources for this user's account
-  const { data: sources } = await supabase
-    .from('knowledge_sources')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const workspace = await getActiveWorkspace(supabase, data.claims.sub)
+  if (!workspace) {
+    redirect('/')
+  }
 
-  return <KnowledgePage initialSources={sources ?? []} />
+  redirect(`/w/${workspace.workspace_id}/knowledge`)
 }

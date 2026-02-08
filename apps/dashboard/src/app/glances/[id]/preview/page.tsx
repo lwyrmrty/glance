@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import PreviewPage from './PreviewPage'
+import { getActiveWorkspace } from '@/lib/workspace'
 
-export default async function GlancePreviewPage({ params }: { params: Promise<{ id: string }> }) {
+// Legacy route — redirects to /w/{workspaceId}/glances/{id}/preview
+export default async function LegacyPreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
@@ -11,15 +12,10 @@ export default async function GlancePreviewPage({ params }: { params: Promise<{ 
     redirect('/login')
   }
 
-  const { data: glance } = await supabase
-    .from('widgets')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (!glance) {
-    redirect('/glances')
+  const workspace = await getActiveWorkspace(supabase, data.claims.sub)
+  if (!workspace) {
+    redirect('/')
   }
 
-  return <PreviewPage glance={glance} />
+  redirect(`/w/${workspace.workspace_id}/glances/${id}/preview`)
 }

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getActiveWorkspace } from '@/lib/workspace'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ============================================
@@ -16,31 +17,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: membership } = await supabase
-      .from('account_memberships')
-      .select('account_id')
-      .eq('user_id', authData.claims.sub)
-      .single()
-
-    if (!membership) {
-      return NextResponse.json({ error: 'No account found' }, { status: 400 })
+    const activeWorkspace = await getActiveWorkspace(supabase, authData.claims.sub)
+    if (!activeWorkspace) {
+      return NextResponse.json({ error: 'No workspace found' }, { status: 400 })
     }
 
     // Get the stored Airtable API key
-    const { data: account } = await supabase
-      .from('accounts')
+    const { data: wsData } = await supabase
+      .from('workspaces')
       .select('airtable_api_key')
-      .eq('id', membership.account_id)
+      .eq('id', activeWorkspace.workspace_id)
       .single()
 
-    if (!account?.airtable_api_key) {
+    if (!wsData?.airtable_api_key) {
       return NextResponse.json(
         { error: 'Airtable is not connected. Add your API key in Integrations.' },
         { status: 400 }
       )
     }
 
-    const apiKey = account.airtable_api_key
+    const apiKey = wsData.airtable_api_key
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action')
 

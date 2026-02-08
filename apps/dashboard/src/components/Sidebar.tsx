@@ -29,49 +29,51 @@ export default function Sidebar({ workspaceName, workspaceId }: SidebarProps) {
         <Link href="/" className="navbaricon w-inline-block">
           <img loading="lazy" src="/images/glanceicon.svg" alt="" />
         </Link>
-        <div className="navblocks">
-          {/* Workspace section label */}
-          <div className="labelrow navlabel">
-            <div className="labeltext small">{workspaceName || 'Workspace'} <span className="dim">Workspace</span></div>
-            <div className="labeldivider darker"></div>
+        {workspaceId && (
+          <div className="navblocks">
+            {/* Workspace section label */}
+            <div className="labelrow navlabel">
+              <div className="labeltext small">{workspaceName || 'Workspace'} <span className="dim">Workspace</span></div>
+              <div className="labeldivider darker"></div>
+            </div>
+            <NavItem
+              href={`${prefix}/glances`}
+              label="Glances"
+              icon="/images/glanceicons.svg"
+              isActive={isActive(`${prefix}/glances`)}
+            />
+            <NavItem
+              href={`${prefix}/knowledge`}
+              label="Knowledge"
+              icon="/images/brain.svg"
+              isActive={isActive(`${prefix}/knowledge`)}
+            />
+            <NavItem
+              href={`${prefix}/accounts`}
+              label="User Data"
+              icon="/images/users.svg"
+              isActive={isActive(`${prefix}/accounts`)}
+            />
+            <NavItem
+              href={`${prefix}/analytics`}
+              label="Analytics"
+              icon="/images/stats.svg"
+              isActive={isActive(`${prefix}/analytics`)}
+            />
+            <NavItem
+              href={`${prefix}/integrations`}
+              label="Integrations"
+              icon="/images/plug-connection.svg"
+              isActive={isActive(`${prefix}/integrations`)}
+            />
+            <NavItem
+              href={`${prefix}/settings`}
+              label="Settings"
+              icon="/images/settings.svg"
+              isActive={isActive(`${prefix}/settings`)}
+            />
           </div>
-          <NavItem
-            href={prefix ? `${prefix}/glances` : '/glances'}
-            label="Glances"
-            icon="/images/glanceicons.svg"
-            isActive={isActive(prefix ? `${prefix}/glances` : '/glances')}
-          />
-          <NavItem
-            href={prefix ? `${prefix}/knowledge` : '/knowledge'}
-            label="Knowledge"
-            icon="/images/brain.svg"
-            isActive={isActive(prefix ? `${prefix}/knowledge` : '/knowledge')}
-          />
-          <NavItem
-            href={prefix ? `${prefix}/accounts` : '/accounts'}
-            label="User Data"
-            icon="/images/users.svg"
-            isActive={isActive(prefix ? `${prefix}/accounts` : '/accounts')}
-          />
-          <NavItem
-            href={prefix ? `${prefix}/analytics` : '/analytics'}
-            label="Analytics"
-            icon="/images/stats.svg"
-            isActive={isActive(prefix ? `${prefix}/analytics` : '/analytics')}
-          />
-          <NavItem
-            href={prefix ? `${prefix}/integrations` : '/integrations'}
-            label="Integrations"
-            icon="/images/plug-connection.svg"
-            isActive={isActive(prefix ? `${prefix}/integrations` : '/integrations')}
-          />
-          <NavItem
-            href={prefix ? `${prefix}/settings` : '/settings'}
-            label="Settings"
-            icon="/images/settings.svg"
-            isActive={isActive(prefix ? `${prefix}/settings` : '/settings')}
-          />
-        </div>
+        )}
       </div>
       <div className="navbarbottom">
         {/* Account section label */}

@@ -9,9 +9,11 @@ type ActiveTab = 'integrations' | 'account-creation'
 interface IntegrationsPageProps {
   airtableConnected?: boolean
   airtableKeyHint?: string | null
+  workspaceName?: string
+  workspaceId?: string
 }
 
-export function IntegrationsPage({ airtableConnected: initialAirtableConnected = false, airtableKeyHint: initialKeyHint = null }: IntegrationsPageProps) {
+export function IntegrationsPage({ airtableConnected: initialAirtableConnected = false, airtableKeyHint: initialKeyHint = null, workspaceName, workspaceId }: IntegrationsPageProps) {
   const { showToast } = useToast()
   const [activeTab, setActiveTab] = useState<ActiveTab>('integrations')
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string | null>(null)
@@ -117,7 +119,7 @@ export function IntegrationsPage({ airtableConnected: initialAirtableConnected =
   return (
     <div className="pagewrapper">
       <div className="pagecontent">
-        <Sidebar />
+        <Sidebar workspaceName={workspaceName} workspaceId={workspaceId} />
 
         {/* ===== Integrations Tab ===== */}
         {activeTab === 'integrations' && (
