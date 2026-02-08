@@ -3,69 +3,100 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export default function Sidebar() {
+interface SidebarProps {
+  workspaceName?: string
+  workspaceId?: string
+}
+
+export default function Sidebar({ workspaceName, workspaceId }: SidebarProps) {
   const pathname = usePathname()
 
-  const isActive = (path: string) => {
-    if (path === '/glances') {
-      // Glances is active for /glances and /glances/* but not for other top-level routes
-      return pathname === '/glances' || (pathname.startsWith('/glances/') && !pathname.startsWith('/glances/knowledge'))
-    }
-    return pathname === path || pathname.startsWith(path + '/')
+  // Build the workspace URL prefix
+  const prefix = workspaceId ? `/w/${workspaceId}` : ''
+
+  const isActive = (href: string) => {
+    // Remove query params and trailing slashes for comparison
+    const cleanPathname = pathname.split('?')[0].replace(/\/$/, '')
+    const cleanHref = href.replace(/\/$/, '')
+    
+    // Check exact match or if pathname starts with the href followed by /
+    return cleanPathname === cleanHref || cleanPathname.startsWith(cleanHref + '/')
   }
 
   return (
     <div className="navwrapper">
       <div className="navbartop">
-        <Link href="/glances" className="navbaricon w-inline-block">
+        <Link href="/" className="navbaricon w-inline-block">
           <img loading="lazy" src="/images/glanceicon.svg" alt="" />
         </Link>
         <div className="navblocks">
-          <NavItem 
-            href="/glances" 
-            label="Glances" 
-            activeIcon="/images/chart-pie-alt.svg"
-            inactiveIcon="/images/glanceicons.svg"
-            isActive={isActive('/glances')}
+          {/* Workspace section label */}
+          <div className="labelrow navlabel">
+            <div className="labeltext small">{workspaceName || 'Workspace'} <span className="dim">Workspace</span></div>
+            <div className="labeldivider darker"></div>
+          </div>
+          <NavItem
+            href={prefix ? `${prefix}/glances` : '/glances'}
+            label="Glances"
+            icon="/images/glanceicons.svg"
+            isActive={isActive(prefix ? `${prefix}/glances` : '/glances')}
           />
-          <NavItem 
-            href="/knowledge" 
-            label="Knowledge" 
-            activeIcon="/images/chart-pie-alt.svg"
-            inactiveIcon="/images/highlighter-line.svg"
-            isActive={isActive('/knowledge')}
+          <NavItem
+            href={prefix ? `${prefix}/knowledge` : '/knowledge'}
+            label="Knowledge"
+            icon="/images/brain.svg"
+            isActive={isActive(prefix ? `${prefix}/knowledge` : '/knowledge')}
           />
-          <NavItem 
-            href="/accounts" 
-            label="User Data" 
-            activeIcon="/images/chart-pie-alt.svg"
-            inactiveIcon="/images/users.svg"
-            isActive={isActive('/accounts')}
+          <NavItem
+            href={prefix ? `${prefix}/accounts` : '/accounts'}
+            label="User Data"
+            icon="/images/users.svg"
+            isActive={isActive(prefix ? `${prefix}/accounts` : '/accounts')}
+          />
+          <NavItem
+            href={prefix ? `${prefix}/analytics` : '/analytics'}
+            label="Analytics"
+            icon="/images/stats.svg"
+            isActive={isActive(prefix ? `${prefix}/analytics` : '/analytics')}
+          />
+          <NavItem
+            href={prefix ? `${prefix}/integrations` : '/integrations'}
+            label="Integrations"
+            icon="/images/plug-connection.svg"
+            isActive={isActive(prefix ? `${prefix}/integrations` : '/integrations')}
+          />
+          <NavItem
+            href={prefix ? `${prefix}/settings` : '/settings'}
+            label="Settings"
+            icon="/images/settings.svg"
+            isActive={isActive(prefix ? `${prefix}/settings` : '/settings')}
           />
         </div>
       </div>
       <div className="navbarbottom">
+        {/* Account section label */}
+        <div className="labelrow navlabel">
+          <div className="labeltext small">Account</div>
+          <div className="labeldivider darker"></div>
+        </div>
         <div className="navblocks">
-          <NavItem 
-            href="/settings" 
-            label="Settings" 
-            activeIcon="/images/chart-pie-alt.svg"
-            inactiveIcon="/images/settings.svg"
-            isActive={isActive('/settings')}
+          <NavItem
+            href="/"
+            label="Workspaces"
+            icon="/images/apps.svg"
+            isActive={pathname === '/'}
           />
-          <NavItem 
-            href="/integrations" 
-            label="Integrations" 
-            activeIcon="/images/chart-pie-alt.svg"
-            inactiveIcon="/images/hourglass-end.svg"
-            isActive={isActive('/integrations')}
+          <NavItem
+            href="/account"
+            label="Account"
+            icon="/images/home.svg"
+            isActive={pathname === '/account' || pathname.startsWith('/account/')}
           />
           <div className="navbarblock logout">
             <form action="/auth/signout" method="POST" style={{ display: 'contents' }}>
               <button type="submit" className="navbarlink-row logout w-inline-block" style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                 <div className="alignrow aligncenter">
                   <div className="navbarlink-icon">
-                    <img loading="lazy" src="/images/golf.svg" alt="" className="navicon activeicon" style={{ display: 'none' }} />
                     <img loading="lazy" src="/images/sign-out-alt.svg" alt="" className="navicon nonactive" style={{ display: 'block' }} />
                   </div>
                   <div>Logout</div>
@@ -78,6 +109,9 @@ export default function Sidebar() {
       </div>
       {/* Embedded CSS for nav icon states */}
       <style dangerouslySetInnerHTML={{ __html: `
+        .navicon.activeicon {
+          display: none;
+        }
         .navicon.nonactive {
           display: block;
         }
@@ -87,6 +121,9 @@ export default function Sidebar() {
         .navbarlink-row.w--current .activeindicator {
           display: block;
         }
+        .navbarlink-icon.active {
+          transform: translateY(-1px);
+        }
       `}} />
     </div>
   )
@@ -95,24 +132,23 @@ export default function Sidebar() {
 interface NavItemProps {
   href: string
   label: string
-  activeIcon?: string
-  inactiveIcon: string
+  icon: string
   isActive: boolean
 }
 
-function NavItem({ href, label, inactiveIcon, isActive }: NavItemProps) {
+function NavItem({ href, label, icon, isActive }: NavItemProps) {
   return (
     <div className="navbarblock">
-      <Link 
-        href={href} 
+      <Link
+        href={href}
         className={`navbarlink-row w-inline-block ${isActive ? 'w--current' : ''}`}
       >
         <div className="alignrow aligncenter">
           <div className="navbarlink-icon">
-            <img 
-              loading="lazy" 
-              src={inactiveIcon} 
-              alt="" 
+            <img
+              loading="lazy"
+              src={icon}
+              alt=""
               className="navicon nonactive"
               style={{ display: 'block' }}
             />

@@ -676,6 +676,10 @@ em {
   font-size: 15px;
   font-weight: 500;
   line-height: 1.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
 }
 
 .tablename.large {
@@ -712,6 +716,8 @@ em {
   grid-column-gap: 5px;
   grid-row-gap: 5px;
   flex: 1;
+  position: relative;
+  z-index: 2;
   justify-content: flex-end;
   align-items: center;
   padding-right: 0;
@@ -896,11 +902,13 @@ em {
   justify-content: space-between;
   align-items: stretch;
   width: 222px;
+  min-width: 222px;
   height: 100vh;
   padding: 20px;
   display: flex;
   position: sticky;
   top: 0;
+  flex-shrink: 0;
 }
 
 .mainwrapper {
@@ -928,9 +936,14 @@ em {
 .navbaricon {
   border-radius: 10px;
   width: 50px;
+  height: 55px;
   margin-bottom: 20px;
   position: relative;
   overflow: hidden;
+}
+
+.navbaricon img {
+  height: 55px;
 }
 
 .fullimage {
@@ -963,7 +976,7 @@ em {
   border-radius: 10px;
   justify-content: space-between;
   align-items: center;
-  padding: 5px;
+  padding: 4px;
   font-weight: 500;
   line-height: 1rem;
   text-decoration: none;
@@ -1032,8 +1045,8 @@ em {
 }
 
 .navblocks {
-  grid-column-gap: 5px;
-  grid-row-gap: 5px;
+  grid-column-gap: 3px;
+  grid-row-gap: 3px;
   flex-flow: column;
   display: flex;
 }
@@ -1171,6 +1184,10 @@ em {
 .labelrow.more-space {
   margin-top: 10px;
   margin-bottom: 10px;
+}
+
+.labelrow.navlabel {
+  margin-bottom: 5px;
 }
 
 .labeldivider {
@@ -3791,4 +3808,8 @@ button:disabled,
   padding-left: 20px;
   padding-right: 20px;
   display: flex;
+}
+
+.preview-link-hover:hover {
+  opacity: 1 !important;
 }
