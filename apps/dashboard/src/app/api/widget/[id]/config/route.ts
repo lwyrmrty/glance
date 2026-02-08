@@ -22,7 +22,7 @@ export async function GET(
 
   const { data: widget, error } = await supabase
     .from('widgets')
-    .select('id, name, logo_url, theme_color, button_style, is_active')
+    .select('id, workspace_id, name, logo_url, theme_color, button_style, is_active')
     .eq('id', id)
     .single()
 
@@ -45,6 +45,7 @@ export async function GET(
   // Build the config object the widget expects
   const config = {
     id: widget.id,
+    workspace_id: widget.workspace_id,
     name: widget.name,
     logo_url: widget.logo_url,
     theme_color: widget.theme_color,

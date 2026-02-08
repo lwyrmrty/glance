@@ -53,12 +53,16 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
     { name: '', icon: '/images/Chats.svg', type: '' },
   ]
   const savedTabs = (glance?.button_style as any)?.tabs ?? defaultTabs
-  const [tabs, setTabs] = useState<{ name: string; icon: string; type: string }[]>(
+  const [tabs, setTabs] = useState<{ name: string; icon: string; type: string; is_premium?: boolean }[]>(
     savedTabs.length === 5 ? savedTabs : defaultTabs
   )
 
   const updateTab = (index: number, field: 'name' | 'icon' | 'type', value: string) => {
     setTabs(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t))
+  }
+
+  const togglePremium = (index: number) => {
+    setTabs(prev => prev.map((t, i) => i === index ? { ...t, is_premium: !t.is_premium } : t))
   }
 
   const [tabIconFiles, setTabIconFiles] = useState<(File | null)[]>([null, null, null, null, null])
@@ -565,6 +569,19 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
                                   </div>
                                 )}
                               </div>
+                              {tab.type && (
+                                <div className="premium-toggle" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: tab.is_premium ? '#7C3AED' : '#999', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!tab.is_premium}
+                                      onChange={() => togglePremium(index)}
+                                      style={{ accentColor: '#7C3AED', width: '14px', height: '14px', cursor: 'pointer' }}
+                                    />
+                                    Premium
+                                  </label>
+                                </div>
+                              )}
                               <div className="rowcard-actions">
                                 <Link href={tab.type ? `${prefix}/glances/${glanceId}/tab/${index}` : '#'} className={`tablebutton square w-inline-block${!tab.type ? ' disabled' : ''}`} onClick={!tab.type ? (e: React.MouseEvent) => e.preventDefault() : undefined}>
                                   <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="go-arrow">
