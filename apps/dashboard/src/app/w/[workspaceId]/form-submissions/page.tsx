@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { validateWorkspaceAccess } from '@/lib/workspace'
-import { AccountsPage } from '@/app/accounts/AccountsPage'
+import { FormSubmissionsPage } from '@/app/form-submissions/FormSubmissionsPage'
 
-export default async function AccountsRoute({ params }: { params: Promise<{ workspaceId: string }> }) {
+export default async function FormSubmissionsRoute({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
@@ -26,7 +26,7 @@ export default async function AccountsRoute({ params }: { params: Promise<{ work
     .limit(3)
 
   return (
-    <AccountsPage
+    <FormSubmissionsPage
       workspaceName={workspace.workspace_name}
       workspaceId={workspaceId}
       glances={glances ?? []}

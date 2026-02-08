@@ -35,17 +35,32 @@ export async function GET(request: NextRequest) {
     return renderPopupResult({ error: 'Missing widget_id in state.' })
   }
 
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-
-  if (!clientId || !clientSecret) {
-    return renderPopupResult({ error: 'Google OAuth not configured.' })
-  }
-
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
   const redirectUri = `${baseUrl}/api/widget-auth/google/callback`
 
   try {
+    const supabase = await createClient()
+
+    // Look up workspace and Google OAuth credentials from widget
+    const { data: widget } = await supabase
+      .from('widgets')
+      .select('id, workspace_id, workspaces(auth_google_client_id, auth_google_client_secret)')
+      .eq('id', widgetId)
+      .eq('is_active', true)
+      .single()
+
+    if (!widget) {
+      return renderPopupResult({ error: 'Widget not found.' })
+    }
+
+    const workspace = widget.workspaces as any
+    const clientId = workspace?.auth_google_client_id
+    const clientSecret = workspace?.auth_google_client_secret
+
+    if (!clientId || !clientSecret) {
+      return renderPopupResult({ error: 'Google OAuth not configured for this workspace.' })
+    }
+
     // Exchange code for tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -75,20 +90,6 @@ export async function GET(request: NextRequest) {
 
     if (!userInfo.email) {
       return renderPopupResult({ error: 'Could not retrieve email from Google.' })
-    }
-
-    const supabase = await createClient()
-
-    // Look up workspace from widget
-    const { data: widget } = await supabase
-      .from('widgets')
-      .select('id, workspace_id')
-      .eq('id', widgetId)
-      .eq('is_active', true)
-      .single()
-
-    if (!widget) {
-      return renderPopupResult({ error: 'Widget not found.' })
     }
 
     const workspaceId = widget.workspace_id

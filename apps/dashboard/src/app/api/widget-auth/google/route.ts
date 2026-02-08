@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 const corsHeaders = {
@@ -14,7 +15,7 @@ export async function OPTIONS() {
  * GET /api/widget-auth/google?widget_id=xxx
  * 
  * Redirects to Google OAuth consent screen.
- * This is called from the widget popup window.
+ * Uses per-workspace Google OAuth credentials.
  */
 export async function GET(request: NextRequest) {
   const widgetId = request.nextUrl.searchParams.get('widget_id')
@@ -23,11 +24,26 @@ export async function GET(request: NextRequest) {
     return new NextResponse('Missing widget_id', { status: 400 })
   }
 
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-  if (!clientId) {
-    return new NextResponse('Google OAuth not configured', { status: 500 })
+  const supabase = await createClient()
+
+  // Look up the workspace's Google OAuth credentials via the widget
+  const { data: widget } = await supabase
+    .from('widgets')
+    .select('workspace_id, workspaces(auth_google_enabled, auth_google_client_id)')
+    .eq('id', widgetId)
+    .eq('is_active', true)
+    .single()
+
+  if (!widget) {
+    return new NextResponse('Widget not found', { status: 404 })
   }
 
+  const workspace = widget.workspaces as any
+  if (!workspace?.auth_google_enabled || !workspace?.auth_google_client_id) {
+    return new NextResponse('Google OAuth not configured for this workspace', { status: 400 })
+  }
+
+  const clientId = workspace.auth_google_client_id
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
   const redirectUri = `${baseUrl}/api/widget-auth/google/callback`
 

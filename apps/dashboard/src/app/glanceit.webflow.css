@@ -1036,6 +1036,11 @@ em {
   overflow: hidden;
 }
 
+.navbarlink-icon.sm svg {
+  width: 18px;
+  height: 18px;
+}
+
 .activeindicator {
   background-color: var(--black);
   border-radius: 10px;

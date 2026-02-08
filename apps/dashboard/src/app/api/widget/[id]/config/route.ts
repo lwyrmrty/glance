@@ -22,7 +22,7 @@ export async function GET(
 
   const { data: widget, error } = await supabase
     .from('widgets')
-    .select('id, workspace_id, name, logo_url, theme_color, button_style, is_active')
+    .select('id, workspace_id, name, logo_url, theme_color, button_style, is_active, workspaces(auth_google_enabled, auth_magic_link_enabled, auth_banner_url, auth_title, auth_subtitle)')
     .eq('id', id)
     .single()
 
@@ -41,6 +41,7 @@ export async function GET(
   }
 
   const buttonStyle = (widget.button_style as Record<string, unknown>) ?? {}
+  const workspace = widget.workspaces as any
 
   // Build the config object the widget expects
   const config = {
@@ -53,6 +54,13 @@ export async function GET(
     prompts: (buttonStyle.prompts as unknown[]) ?? [],
     callout_text: (buttonStyle.callout_text as string) ?? '',
     callout_url: (buttonStyle.callout_url as string) ?? '',
+    auth: {
+      google_enabled: workspace?.auth_google_enabled ?? false,
+      magic_link_enabled: workspace?.auth_magic_link_enabled ?? true,
+      banner_url: workspace?.auth_banner_url ?? null,
+      title: workspace?.auth_title ?? 'Premium Content',
+      subtitle: workspace?.auth_subtitle ?? 'Login or create your FREE account to access this content.',
+    },
   }
 
   return NextResponse.json(config, {
