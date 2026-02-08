@@ -21,6 +21,28 @@ interface WidgetUser {
   created_at: string
 }
 
+interface UserEvent {
+  id: string
+  event_type: string
+  event_data: Record<string, string>
+  created_at: string
+}
+
+interface UserSession {
+  session_id: string
+  started_at: string
+  event_count: number
+  events: UserEvent[]
+}
+
+interface ChatSession {
+  id: string
+  tab_name: string | null
+  message_count: number
+  created_at: string
+  updated_at: string
+}
+
 export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPageProps) {
   const [users, setUsers] = useState<WidgetUser[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
@@ -29,6 +51,12 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedUser, setSelectedUser] = useState<WidgetUser | null>(null)
+  const [sessions, setSessions] = useState<UserSession[]>([])
+  const [totalSessions, setTotalSessions] = useState(0)
+  const [sessionsPage, setSessionsPage] = useState(1)
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
+  const [totalChats, setTotalChats] = useState(0)
+  const [chatsPage, setChatsPage] = useState(1)
   const pageSize = 15
 
   const fetchUsers = useCallback(async () => {
@@ -59,6 +87,38 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
   useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
+
+  const fetchActivity = useCallback(async () => {
+    if (!selectedUser) return
+    try {
+      const params = new URLSearchParams({
+        user_id: selectedUser.id,
+        events_page: sessionsPage.toString(),
+        chats_page: chatsPage.toString(),
+      })
+      const res = await fetch(`/api/widget-auth/users/activity?${params.toString()}`)
+      const data = await res.json()
+      if (res.ok) {
+        setSessions(data.sessions || [])
+        setTotalSessions(data.total_sessions || 0)
+        setChatSessions(data.chat_sessions || [])
+        setTotalChats(data.total_chats || 0)
+      }
+    } catch (err) {
+      console.error('Failed to fetch user activity:', err)
+    }
+  }, [selectedUser, sessionsPage, chatsPage])
+
+  useEffect(() => {
+    if (selectedUser) {
+      fetchActivity()
+    } else {
+      setSessions([])
+      setTotalSessions(0)
+      setChatSessions([])
+      setTotalChats(0)
+    }
+  }, [selectedUser, fetchActivity])
 
   const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize))
 
@@ -100,6 +160,33 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' \u2022 ' +
       d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   }
+
+  const formatEventTime = (dateStr: string) => {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' \u2022 ' +
+      d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+
+  const formatSessionHeader = (dateStr: string) => {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' +
+      d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+
+  const getEventLabel = (event: UserEvent) => {
+    const tabName = event.event_data?.tab_name || event.event_data?.form_name || ''
+    switch (event.event_type) {
+      case 'tab_viewed': return { prefix: 'Clicked on', name: tabName, icon: 'click' }
+      case 'form_submitted': return { prefix: 'Form Submitted on', name: tabName, icon: 'form' }
+      case 'chat_started': return { prefix: 'Chatted on', name: tabName, icon: 'chat' }
+      case 'widget_opened': return { prefix: 'Opened', name: 'Widget', icon: 'click' }
+      case 'link_clicked': return { prefix: 'Clicked link on', name: tabName, icon: 'click' }
+      default: return { prefix: event.event_type, name: '', icon: 'click' }
+    }
+  }
+
+  const sessionsTotalPages = Math.max(1, Math.ceil(totalSessions / 3))
+  const chatsTotalPages = Math.max(1, Math.ceil(totalChats / 5))
 
   const prefix = workspaceId ? `/w/${workspaceId}` : ''
 
@@ -192,7 +279,7 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
                           key={user.id}
                           className={`tablerow${selectedUser?.id === user.id ? ' selectedrow' : ''}`}
                           style={{ cursor: 'pointer' }}
-                          onClick={() => setSelectedUser(user)}
+                          onClick={() => { setSelectedUser(user); setSessionsPage(1); setChatsPage(1) }}
                         >
                           <div className="tablerow-left">
                             <div className="tableblock">
@@ -221,7 +308,7 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
                               <a
                                 href="#"
                                 className="tablebutton w-inline-block"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedUser(user) }}
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedUser(user); setSessionsPage(1); setChatsPage(1) }}
                               >
                                 <div>View</div>
                               </a>
@@ -310,7 +397,7 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
                     </div>
                     <div className="drawercontent-block">
                       <div className="labelrow">
-                        <div className="labeltext">User Info</div>
+                        <div className="labeltext">Player Info</div>
                         <div className="labeldivider"></div>
                       </div>
                       <div className="drawercontent-blocl">
@@ -321,14 +408,169 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
                         <div className="labeltext dim">Email</div>
                         <div className="sidedrawer-content">{selectedUser.email}</div>
                       </div>
-                      <div className="drawercontent-blocl">
-                        <div className="labeltext dim">Auth Method</div>
-                        <div className="sidedrawer-content" style={{ textTransform: 'capitalize' }}>{selectedUser.auth_provider}</div>
+                    </div>
+
+                    {/* Sessions */}
+                    <div className="drawercontent-block">
+                      <div className="labelrow">
+                        <div className="labeltext">Sessions <span className="dim">{totalSessions}</span></div>
+                        <div className="labeldivider"></div>
                       </div>
-                      {selectedUser.last_active_at && (
-                        <div className="drawercontent-blocl">
-                          <div className="labeltext dim">Last Active</div>
-                          <div className="sidedrawer-content">{formatDateTime(selectedUser.last_active_at)}</div>
+
+                      <div style={{ maxHeight: '390px', overflowY: 'auto' }}>
+                      {sessions.length === 0 ? (
+                        <div style={{ padding: '10px 0', color: '#999', fontSize: '13px' }}>No sessions recorded yet.</div>
+                      ) : sessions.map((session) => (
+                        <div className="rowcards" key={session.session_id}>
+                          <div className="rowcard verticaldown">
+                            <div className="labelrow">
+                              <div className="labeltext">{formatSessionHeader(session.started_at)} <span className="dim">{session.event_count} events</span></div>
+                              <div className="labeldivider"></div>
+                            </div>
+                            <div className="rowcards">
+                              {session.events.map((event) => {
+                                const label = getEventLabel(event)
+                                return (
+                                  <div className="rowcard verticaldown white whitebg" key={event.id}>
+                                    <div className="alignsides">
+                                      <div className="alignrow aligncenter">
+                                        <div className="tableimage small">
+                                          {label.icon === 'form' ? (
+                                            <img src="https://cdn.prod.website-files.com/69821d3924ad0bc526071a2f/6988f2da3ba823fa3910529d_pen-field.svg" loading="lazy" alt="" className="navicon nonactive" />
+                                          ) : label.icon === 'chat' ? (
+                                            <img src="https://cdn.prod.website-files.com/69821d3924ad0bc526071a2f/69821d3924ad0bc526071a9e_messages.svg" loading="lazy" alt="" className="navicon nonactive" />
+                                          ) : (
+                                            <img src="https://cdn.prod.website-files.com/69821d3924ad0bc526071a2f/6988f2da0057733c82c76211_cursor-finger-click.svg" loading="lazy" alt="" className="navicon nonactive" />
+                                          )}
+                                        </div>
+                                        <div>
+                                          <div><span className="dim">{label.prefix}</span> {label.name}</div>
+                                          <div className="tablesublabel">{formatEventTime(event.created_at)}</div>
+                                        </div>
+                                      </div>
+                                      {(event.event_type === 'form_submitted' || event.event_type === 'chat_started') && (
+                                        <div className="rowcard-actions">
+                                          <a href="#" className="rowcard-action w-inline-block">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="actionicon large">
+                                              <polyline points="7 7 17 7 17 17"></polyline>
+                                              <line x1="7" y1="17" x2="17" y2="7"></line>
+                                            </svg>
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      </div>
+                      {/* Sessions Pagination */}
+                      {sessionsTotalPages > 1 && (
+                        <div className="alignrow">
+                          <a
+                            href="#"
+                            className="paginationlink w-inline-block"
+                            onClick={(e) => { e.preventDefault(); if (sessionsPage > 1) setSessionsPage(sessionsPage - 1) }}
+                            style={{ opacity: sessionsPage > 1 ? 1 : 0.3 }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="paginationicons">
+                              <g><path d="M19 12H5M5 12L11 18M5 12L11 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></g>
+                            </svg>
+                          </a>
+                          {Array.from({ length: Math.min(sessionsTotalPages, 4) }, (_, i) => i + 1).map((page) => (
+                            <a
+                              key={page}
+                              href="#"
+                              className={`paginationlink w-inline-block${page === sessionsPage ? ' active' : ''}`}
+                              onClick={(e) => { e.preventDefault(); setSessionsPage(page) }}
+                            >
+                              <div>{page}</div>
+                            </a>
+                          ))}
+                          <a
+                            href="#"
+                            className="paginationlink w-inline-block"
+                            onClick={(e) => { e.preventDefault(); if (sessionsPage < sessionsTotalPages) setSessionsPage(sessionsPage + 1) }}
+                            style={{ opacity: sessionsPage < sessionsTotalPages ? 1 : 0.3 }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="paginationicons">
+                              <g><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></g>
+                            </svg>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Chats Created */}
+                    <div className="drawercontent-block">
+                      <div className="labelrow">
+                        <div className="labeltext">Chats created <span className="dim">{totalChats}</span></div>
+                        <div className="labeldivider"></div>
+                      </div>
+                      <div className="rowcards">
+                        {chatSessions.length === 0 ? (
+                          <div style={{ padding: '10px 0', color: '#999', fontSize: '13px' }}>No chats recorded yet.</div>
+                        ) : chatSessions.map((chat) => (
+                          <div className="rowcard verticaldown" key={chat.id}>
+                            <div className="alignsides">
+                              <div className="alignrow aligncenter">
+                                <div className="tableimage small">
+                                  <img src="https://cdn.prod.website-files.com/69821d3924ad0bc526071a2f/69821d3924ad0bc526071a9e_messages.svg" loading="lazy" alt="" className="navicon nonactive" />
+                                </div>
+                                <div>
+                                  <div>{formatDate(chat.created_at)}</div>
+                                  <div className="tablesublabel">{formatEventTime(chat.created_at)} &bull; {chat.message_count} Messages</div>
+                                </div>
+                              </div>
+                              <div className="rowcard-actions">
+                                <a href="#" className="rowcard-action w-inline-block">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="actionicon large">
+                                    <polyline points="7 7 17 7 17 17"></polyline>
+                                    <line x1="7" y1="17" x2="17" y2="7"></line>
+                                  </svg>
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Chats Pagination */}
+                      {chatsTotalPages > 1 && (
+                        <div className="alignrow">
+                          <a
+                            href="#"
+                            className="paginationlink w-inline-block"
+                            onClick={(e) => { e.preventDefault(); if (chatsPage > 1) setChatsPage(chatsPage - 1) }}
+                            style={{ opacity: chatsPage > 1 ? 1 : 0.3 }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="paginationicons">
+                              <g><path d="M19 12H5M5 12L11 18M5 12L11 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></g>
+                            </svg>
+                          </a>
+                          {Array.from({ length: Math.min(chatsTotalPages, 7) }, (_, i) => i + 1).map((page) => (
+                            <a
+                              key={page}
+                              href="#"
+                              className={`paginationlink w-inline-block${page === chatsPage ? ' active' : ''}`}
+                              onClick={(e) => { e.preventDefault(); setChatsPage(page) }}
+                            >
+                              <div>{page}</div>
+                            </a>
+                          ))}
+                          <a
+                            href="#"
+                            className="paginationlink w-inline-block"
+                            onClick={(e) => { e.preventDefault(); if (chatsPage < chatsTotalPages) setChatsPage(chatsPage + 1) }}
+                            style={{ opacity: chatsPage < chatsTotalPages ? 1 : 0.3 }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="paginationicons">
+                              <g><path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></g>
+                            </svg>
+                          </a>
                         </div>
                       )}
                     </div>

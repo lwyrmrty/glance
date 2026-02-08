@@ -111,7 +111,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   }
 
   // Form-specific controls (only used when isFormTab)
-  const { formView, setFormView, loadSubmissions, submissions } = formTab as FormTabHookResult
+  const { formView, setFormView, loadSubmissions, submissions, submissionsPanel } = formTab as FormTabHookResult
   const isSubmissionsView = isFormTab && formView === 'submissions'
 
   return (
@@ -327,6 +327,13 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
               </div>
 }
             </div>
+
+            {/* ===== RIGHT SIDE: Detail panel when in submissions view ===== */}
+            {isSubmissionsView && (
+              <div className="contextside">
+                {submissionsPanel}
+              </div>
+            )}
 
             {/* ===== RIGHT SIDE: Demo Preview — hidden in submissions view ===== */}
             {!isSubmissionsView && <div className="demoside downflex">

@@ -1686,6 +1686,10 @@ em {
   padding-left: 8px;
 }
 
+.rowcard.whitebg {
+  background-color: #fff;
+}
+
 .rowcard-actions {
   grid-column-gap: 5px;
   grid-row-gap: 5px;
