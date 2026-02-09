@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fireWebhooks } from '@/lib/webhooks'
 import { NextRequest, NextResponse } from 'next/server'
 
 // CORS headers — the widget submits from external sites
@@ -189,6 +190,22 @@ export async function POST(request: NextRequest) {
         { status: 500, headers: corsHeaders }
       )
     }
+
+    // Fire workspace-level form_submitted webhooks (non-blocking)
+    const webhookFormPayload: Record<string, unknown> = {
+      form_name: formName,
+      widget_id: widgetId,
+      data,
+    }
+    if (Object.keys(fileUrls).length > 0) {
+      webhookFormPayload.file_urls = fileUrls
+    }
+    if (loggedInUser) {
+      webhookFormPayload.user_email = loggedInUser.email
+      webhookFormPayload.user_first_name = loggedInUser.first_name
+      webhookFormPayload.user_last_name = loggedInUser.last_name
+    }
+    fireWebhooks(widget.workspace_id, 'form_submitted', webhookFormPayload)
 
     return NextResponse.json(
       { success: true, success_message: successMessage },

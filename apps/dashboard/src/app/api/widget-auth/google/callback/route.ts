@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fireWebhooks } from '@/lib/webhooks'
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 
@@ -126,6 +127,15 @@ export async function GET(request: NextRequest) {
       }
 
       user = newUser
+
+      // Fire account_created webhooks (non-blocking)
+      fireWebhooks(workspaceId, 'account_created', {
+        user_id: newUser.id,
+        email: newUser.email,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        auth_provider: 'google',
+      })
     } else {
       // Update existing user
       await supabase

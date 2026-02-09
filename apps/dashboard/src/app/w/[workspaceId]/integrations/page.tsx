@@ -17,21 +17,12 @@ export default async function IntegrationsRoute({ params }: { params: Promise<{ 
     redirect('/')
   }
 
-  // Fetch workspace to check Airtable key status
-  let airtableConnected = false
-  let airtableKeyHint: string | null = null
-
-  const { data: wsData } = await supabase
-    .from('workspaces')
-    .select('airtable_api_key')
-    .eq('id', workspaceId)
-    .single()
-
-  if (wsData?.airtable_api_key) {
-    airtableConnected = true
-    const key = wsData.airtable_api_key
-    airtableKeyHint = key.slice(0, 6) + '...' + key.slice(-4)
-  }
+  // Fetch Airtable keys
+  const { data: airtableKeys } = await supabase
+    .from('workspace_airtable_keys')
+    .select('id, workspace_id, name, key_hint, created_at, updated_at')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
 
   // Fetch glances for sidebar
   const { data: glances } = await supabase
@@ -41,13 +32,20 @@ export default async function IntegrationsRoute({ params }: { params: Promise<{ 
     .order('created_at', { ascending: false })
     .limit(3)
 
+  // Fetch webhooks for the webhooks tab
+  const { data: webhooks } = await supabase
+    .from('workspace_webhooks')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+
   return (
     <IntegrationsPage
-      airtableConnected={airtableConnected}
-      airtableKeyHint={airtableKeyHint}
       workspaceName={workspace.workspace_name}
       workspaceId={workspaceId}
       glances={glances ?? []}
+      initialAirtableKeys={airtableKeys ?? []}
+      initialWebhooks={webhooks ?? []}
     />
   )
 }

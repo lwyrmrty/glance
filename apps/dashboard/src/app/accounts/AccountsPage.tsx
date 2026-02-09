@@ -301,7 +301,7 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
                           <div className="tablerow-right">
                             <div className="tableblock right">
                               <div>
-                                <div className="urltext">{formatDate(user.created_at)}</div>
+                                <div className="urltext">{user.last_active_at ? formatDate(user.last_active_at) : formatDate(user.created_at)}</div>
                               </div>
                             </div>
                             <div className="tableblock right">
@@ -394,6 +394,9 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
                     <div className="drawercontent-block _5">
                       <h2 className="sidedrawer-heading">{selectedUser.first_name} {selectedUser.last_name}</h2>
                       <div className="pagesubheading"><span className="dim">Created</span> {formatDateTime(selectedUser.created_at)}</div>
+                      {selectedUser.last_active_at && (
+                        <div className="pagesubheading"><span className="dim">Last Active</span> {formatDateTime(selectedUser.last_active_at)}</div>
+                      )}
                     </div>
                     <div className="drawercontent-block">
                       <div className="labelrow">

@@ -1,11 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
-import { getActiveWorkspace } from '@/lib/workspace'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ============================================
-// GET /api/airtable?action=bases — List bases the user has access to
-// GET /api/airtable?action=tables&baseId=xxx — List tables in a base
-// GET /api/airtable?action=views&baseId=xxx&tableId=xxx — List views in a table
+// GET /api/airtable?action=bases&key_id=xxx — List bases the key has access to
+// GET /api/airtable?action=tables&key_id=xxx&baseId=xxx — List tables in a base
 // ============================================
 
 export async function GET(request: NextRequest) {
@@ -17,28 +15,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const activeWorkspace = await getActiveWorkspace(supabase, authData.claims.sub)
-    if (!activeWorkspace) {
-      return NextResponse.json({ error: 'No workspace found' }, { status: 400 })
-    }
+    const { searchParams } = new URL(request.url)
+    const keyId = searchParams.get('key_id')
+    const action = searchParams.get('action')
 
-    // Get the stored Airtable API key
-    const { data: wsData } = await supabase
-      .from('workspaces')
-      .select('airtable_api_key')
-      .eq('id', activeWorkspace.workspace_id)
-      .single()
-
-    if (!wsData?.airtable_api_key) {
+    if (!keyId) {
       return NextResponse.json(
-        { error: 'Airtable is not connected. Add your API key in Integrations.' },
+        { error: 'Missing key_id parameter. Select an Airtable key first.' },
         { status: 400 }
       )
     }
 
-    const apiKey = wsData.airtable_api_key
-    const { searchParams } = new URL(request.url)
-    const action = searchParams.get('action')
+    // Look up the key (RLS ensures only workspace members can read it)
+    const { data: keyData, error: keyError } = await supabase
+      .from('workspace_airtable_keys')
+      .select('api_key')
+      .eq('id', keyId)
+      .single()
+
+    if (keyError || !keyData?.api_key) {
+      return NextResponse.json(
+        { error: 'Airtable key not found. It may have been deleted.' },
+        { status: 404 }
+      )
+    }
+
+    const apiKey = keyData.api_key
 
     if (action === 'bases') {
       // List all bases

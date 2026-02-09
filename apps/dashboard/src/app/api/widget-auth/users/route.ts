@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .from('widget_users')
       .select('*', { count: 'exact' })
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
+      .order('last_active_at', { ascending: false, nullsFirst: false })
 
     if (search) {
       // Search by name or email

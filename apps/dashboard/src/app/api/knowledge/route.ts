@@ -746,7 +746,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { type, shareLink, baseId, baseName, tableId, tableName, viewId, viewName, content: mdContent, fileName: mdFileName, url: websiteUrl, comments: sourceComments } = body
+    const { type, shareLink, baseId, baseName, tableId, tableName, viewId, viewName, airtableKeyId, content: mdContent, fileName: mdFileName, url: websiteUrl, comments: sourceComments } = body
 
     // Validate based on type
     if (type === 'google_doc' || type === 'google_sheet') {
@@ -807,7 +807,7 @@ export async function POST(request: NextRequest) {
       }
       config = { shareLink, resourceId }
     } else if (type === 'airtable_table') {
-      config = { baseId, baseName, tableId, tableName, viewId, viewName, selectedFields: body.selectedFields }
+      config = { baseId, baseName, tableId, tableName, viewId, viewName, airtableKeyId, selectedFields: body.selectedFields }
     } else if (type === 'markdown') {
       config = { fileName: mdFileName || 'document.md' }
     } else if (type === 'website') {
@@ -854,18 +854,21 @@ export async function POST(request: NextRequest) {
       } else if (type === 'google_sheet') {
         content = await fetchGoogleSheetContent(resourceId!)
       } else if (type === 'airtable_table') {
-        // Fetch the Airtable API key from the account
-        const { data: workspace } = await supabase
-          .from('workspaces')
-          .select('airtable_api_key')
-          .eq('id', membership.workspace_id)
+        // Look up the Airtable API key by key ID
+        if (!airtableKeyId) {
+          throw new Error('No Airtable key selected. Choose a key when creating the source.')
+        }
+        const { data: keyData } = await supabase
+          .from('workspace_airtable_keys')
+          .select('api_key')
+          .eq('id', airtableKeyId)
           .single()
 
-        if (!workspace?.airtable_api_key) {
-          throw new Error('Airtable is not connected. Add your API key in Integrations.')
+        if (!keyData?.api_key) {
+          throw new Error('Airtable key not found. It may have been deleted.')
         }
 
-        content = await fetchAirtableContent(baseId, tableId, workspace.airtable_api_key, viewId, body.selectedFields)
+        content = await fetchAirtableContent(baseId, tableId, keyData.api_key, viewId, body.selectedFields)
       } else if (type === 'markdown') {
         content = mdContent
       } else if (type === 'website') {
@@ -1088,21 +1091,23 @@ export async function PUT(request: NextRequest) {
       } else if (type === 'google_sheet') {
         content = await fetchGoogleSheetContent(resourceId!)
       } else if (type === 'airtable_table') {
-        // Get the API key from the workspace
-        const resyncWorkspace = await getActiveWorkspace(supabase, (await supabase.auth.getClaims()).data?.claims?.sub ?? '')
-        const membership = resyncWorkspace ? { workspace_id: resyncWorkspace.workspace_id } : null
-
-        const { data: wsData } = await supabase
-          .from('workspaces')
-          .select('airtable_api_key')
-          .eq('id', membership?.workspace_id)
-          .single()
-
-        if (!wsData?.airtable_api_key) {
-          throw new Error('Airtable is not connected. Add your API key in Integrations.')
+        // Look up the Airtable API key by key ID stored in source config
+        const keyId = typedConfig.airtableKeyId
+        if (!keyId) {
+          throw new Error('This knowledge source has no linked Airtable key. Please delete and re-create it.')
         }
 
-        content = await fetchAirtableContent(typedConfig.baseId, typedConfig.tableId, wsData.airtable_api_key, typedConfig.viewId, typedConfig.selectedFields)
+        const { data: keyData } = await supabase
+          .from('workspace_airtable_keys')
+          .select('api_key')
+          .eq('id', keyId)
+          .single()
+
+        if (!keyData?.api_key) {
+          throw new Error('The Airtable key used by this source has been deleted. Please delete and re-create the source with a valid key.')
+        }
+
+        content = await fetchAirtableContent(typedConfig.baseId, typedConfig.tableId, keyData.api_key, typedConfig.viewId, typedConfig.selectedFields)
       } else if (type === 'markdown') {
         // Markdown content is stored directly — re-chunk from stored content
         content = source.content

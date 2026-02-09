@@ -85,6 +85,9 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
   const mdFileInputRef = useRef<HTMLInputElement>(null)
 
   // Airtable create flow state
+  const [airtableAvailableKeys, setAirtableAvailableKeys] = useState<{ id: string; name: string; key_hint: string }[]>([])
+  const [selectedAirtableKeyId, setSelectedAirtableKeyId] = useState('')
+  const [loadingKeys, setLoadingKeys] = useState(false)
   const [airtableBases, setAirtableBases] = useState<{ id: string; name: string }[]>([])
   const [airtableTables, setAirtableTables] = useState<{ id: string; name: string; fields?: { id: string; name: string; type: string }[]; views?: { id: string; name: string; type: string }[] }[]>([])
   const [selectedBaseId, setSelectedBaseId] = useState('')
@@ -188,8 +191,10 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
     setMdFileContent('')
 
     if (selectedCreateType === 'airtable') {
-      // Fetch bases from Airtable before showing the form
-      setLoadingBases(true)
+      // Fetch available keys first, then user picks one to load bases
+      setLoadingKeys(true)
+      setAirtableAvailableKeys([])
+      setSelectedAirtableKeyId('')
       setAirtableBases([])
       setAirtableTables([])
       setSelectedBaseId('')
@@ -199,22 +204,67 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
       setPanelView('create-form')
 
       try {
-        const response = await fetch('/api/airtable?action=bases')
+        const response = await fetch(`/api/airtable/keys?workspace_id=${workspaceId}`)
         const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch keys')
+        const keys = data.keys || []
+        setAirtableAvailableKeys(keys)
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch bases')
+        // Auto-select if only one key exists
+        if (keys.length === 1) {
+          setSelectedAirtableKeyId(keys[0].id)
+          // Also fetch bases immediately
+          setLoadingBases(true)
+          try {
+            const basesRes = await fetch(`/api/airtable?action=bases&key_id=${keys[0].id}`)
+            const basesData = await basesRes.json()
+            if (!basesRes.ok) throw new Error(basesData.error || 'Failed to fetch bases')
+            setAirtableBases(basesData.bases || [])
+          } catch (err) {
+            console.error('Fetch bases error:', err)
+            showToast(err instanceof Error ? err.message : 'Failed to load bases.', 'error')
+          } finally {
+            setLoadingBases(false)
+          }
         }
-
-        setAirtableBases(data.bases || [])
       } catch (error) {
-        console.error('Fetch bases error:', error)
-        showToast(error instanceof Error ? error.message : 'Failed to load Airtable bases.', 'error')
+        console.error('Fetch keys error:', error)
+        showToast(error instanceof Error ? error.message : 'Failed to load Airtable keys.', 'error')
       } finally {
-        setLoadingBases(false)
+        setLoadingKeys(false)
       }
     } else {
       setPanelView('create-form')
+    }
+  }
+
+  const handleSelectAirtableKey = async (keyId: string) => {
+    setSelectedAirtableKeyId(keyId)
+    setAirtableBases([])
+    setAirtableTables([])
+    setSelectedBaseId('')
+    setSelectedBaseName('')
+    setSelectedTableId('')
+    setSelectedTableName('')
+    setSelectedViewId('')
+    setSelectedViewName('')
+    setAvailableViews([])
+    setAvailableFields([])
+    setSelectedFields([])
+
+    if (!keyId) return
+
+    setLoadingBases(true)
+    try {
+      const response = await fetch(`/api/airtable?action=bases&key_id=${keyId}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to fetch bases')
+      setAirtableBases(data.bases || [])
+    } catch (error) {
+      console.error('Fetch bases error:', error)
+      showToast(error instanceof Error ? error.message : 'Failed to load bases.', 'error')
+    } finally {
+      setLoadingBases(false)
     }
   }
 
@@ -232,7 +282,7 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
     setLoadingTables(true)
 
     try {
-      const response = await fetch(`/api/airtable?action=tables&baseId=${baseId}`)
+      const response = await fetch(`/api/airtable?action=tables&key_id=${selectedAirtableKeyId}&baseId=${baseId}`)
       const data = await response.json()
 
       if (!response.ok) {
@@ -334,7 +384,7 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
 
     // Validate based on type
     if ((selectedCreateType === 'google_doc' || selectedCreateType === 'google_sheet') && !shareLink.trim()) return
-    if (selectedCreateType === 'airtable' && (!selectedBaseId || !selectedTableId)) return
+    if (selectedCreateType === 'airtable' && (!selectedAirtableKeyId || !selectedBaseId || !selectedTableId)) return
     if (selectedCreateType === 'markdown' && !mdFileContent.trim()) return
     if (selectedCreateType === 'website' && !shareLink.trim()) return
 
@@ -351,6 +401,7 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
       if (selectedCreateType === 'google_doc' || selectedCreateType === 'google_sheet') {
         bodyPayload.shareLink = shareLink.trim()
       } else if (selectedCreateType === 'airtable') {
+        bodyPayload.airtableKeyId = selectedAirtableKeyId
         bodyPayload.baseId = selectedBaseId
         bodyPayload.baseName = selectedBaseName
         bodyPayload.tableId = selectedTableId
@@ -1063,7 +1114,36 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
                       <div className="formblock w-form">
                         <form onSubmit={(e) => e.preventDefault()}>
                           <div className="formcontent">
-                            {/* Base picker */}
+                            {/* Key picker */}
+                            <div className="fieldblocks">
+                              <div className="labelrow">
+                                <div className="labeltext">Select an API Key</div>
+                                <div className="labeldivider"></div>
+                              </div>
+                              {loadingKeys ? (
+                                <div className="fieldexplainer">Loading keys...</div>
+                              ) : airtableAvailableKeys.length === 0 ? (
+                                <div className="fieldexplainer">
+                                  No Airtable keys found.{' '}
+                                  <a href={`/w/${workspaceId}/integrations`} style={{ textDecoration: 'underline' }}>Add one in Integrations</a> first.
+                                </div>
+                              ) : (
+                                <select
+                                  className="formfields w-input"
+                                  value={selectedAirtableKeyId}
+                                  onChange={(e) => handleSelectAirtableKey(e.target.value)}
+                                  disabled={syncing}
+                                >
+                                  {airtableAvailableKeys.length > 1 && <option value="">Choose a key...</option>}
+                                  {airtableAvailableKeys.map(k => (
+                                    <option key={k.id} value={k.id}>{k.name || 'Untitled Key'} ({k.key_hint})</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+
+                            {/* Base picker (shown after key is selected) */}
+                            {selectedAirtableKeyId && (<>
                             <div className="fieldblocks">
                               <div className="labelrow">
                                 <div className="labeltext">Select a Base</div>
@@ -1073,8 +1153,8 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
                                 <div className="fieldexplainer">Loading bases...</div>
                               ) : airtableBases.length === 0 ? (
                                 <div className="fieldexplainer">
-                                  No bases found. Make sure your Airtable API key has access to at least one base.{' '}
-                                  <a href="/integrations" style={{ textDecoration: 'underline' }}>Check Integrations</a>
+                                  No bases found. Make sure this key has access to at least one base.{' '}
+                                  <a href={`/w/${workspaceId}/integrations`} style={{ textDecoration: 'underline' }}>Check Integrations</a>
                                 </div>
                               ) : (
                                 <select
@@ -1208,6 +1288,7 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
                                 </div>
                               )}
                             </>)}
+                            </>)}
                             <div className="fieldblocks">
                               <div className="labelrow">
                                 <div className="labeltext">Comments</div>
@@ -1236,9 +1317,9 @@ export function KnowledgePage({ initialSources = [], workspaceName, workspaceId,
                       ) : (
                         <a
                           href="#"
-                          className={`buttonblock callout w-inline-block${!selectedBaseId || !selectedTableId ? ' disabled' : ''}`}
+                          className={`buttonblock callout w-inline-block${!selectedAirtableKeyId || !selectedBaseId || !selectedTableId ? ' disabled' : ''}`}
                           onClick={handleCreateAndSync}
-                          style={!selectedBaseId || !selectedTableId ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+                          style={!selectedAirtableKeyId || !selectedBaseId || !selectedTableId ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
                         >
                           <div>Create &amp; Sync</div>
                         </a>
