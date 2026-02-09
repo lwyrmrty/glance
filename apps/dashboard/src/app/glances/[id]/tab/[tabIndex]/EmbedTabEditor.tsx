@@ -19,36 +19,8 @@ function getTallyEmbedUrl(url: string): string | null {
   return null
 }
 
-function getSpotifyEmbedUrl(url: string): string | null {
-  if (!url) return null
-  try {
-    const parsed = new URL(url)
-    if (!['open.spotify.com', 'spotify.com', 'www.spotify.com'].includes(parsed.hostname)) return null
-    if (parsed.pathname.startsWith('/embed/playlist/') || parsed.pathname.startsWith('/embed/show/')) {
-      return parsed.toString()
-    }
-    if (parsed.pathname.startsWith('/playlist/')) {
-      const playlistId = parsed.pathname.split('/playlist/')[1]?.split('/')[0]
-      if (playlistId) {
-        return `https://open.spotify.com/embed/playlist/${playlistId}`
-      }
-    }
-    if (parsed.pathname.startsWith('/show/')) {
-      const showId = parsed.pathname.split('/show/')[1]?.split('/')[0]
-      if (showId) {
-        return `https://open.spotify.com/embed/show/${showId}`
-      }
-    }
-  } catch {
-    return null
-  }
-  return null
-}
-
-function getProxyUrl(type: string, url: string): string {
-  return type === 'Spotify'
-    ? `/spotify-proxy?url=${encodeURIComponent(url)}`
-    : `/tally-proxy?url=${encodeURIComponent(url)}`
+function getProxyUrl(url: string): string {
+  return `/tally-proxy?url=${encodeURIComponent(url)}`
 }
 
 export function useEmbedTab({ tab, onSave }: TabHookProps): TabHookResult {
@@ -60,9 +32,7 @@ export function useEmbedTab({ tab, onSave }: TabHookProps): TabHookResult {
   const [originalUrl, setOriginalUrl] = useState(savedOriginalUrl)
 
   // Derived
-  const tabType = (tab as any).type || ''
-  const isSpotify = tabType === 'Spotify'
-  const embedUrl = isSpotify ? getSpotifyEmbedUrl(originalUrl) || '' : getTallyEmbedUrl(originalUrl) || ''
+  const embedUrl = getTallyEmbedUrl(originalUrl) || ''
 
   // Change detection — also trigger save if embed_url is missing but we can compute it
   const hasChanges = originalUrl !== savedOriginalUrl || (embedUrl && embedUrl !== savedEmbedUrl)
@@ -86,13 +56,13 @@ export function useEmbedTab({ tab, onSave }: TabHookProps): TabHookResult {
           <div className="formcontent">
             <div className="fieldblocks">
               <div className="labelrow">
-                <div className="labeltext">{isSpotify ? 'Spotify URL' : 'Tally Form URL'}</div>
+                <div className="labeltext">Tally Form URL</div>
                 <div className="labeldivider"></div>
               </div>
               <input
                 className="formfields urlfield w-input"
                 maxLength={512}
-                placeholder={isSpotify ? 'https://open.spotify.com/playlist/your-playlist-id or /show/your-show-id' : 'https://tally.so/r/your-form-id'}
+                placeholder="https://tally.so/r/your-form-id"
                 type="url"
                 value={originalUrl}
                 onChange={(e) => setOriginalUrl(e.target.value)}
@@ -104,9 +74,7 @@ export function useEmbedTab({ tab, onSave }: TabHookProps): TabHookResult {
               )}
               {originalUrl && !embedUrl && (
                 <div style={{ color: '#ef4444', fontSize: 13, marginTop: 6, fontWeight: 500 }}>
-                  {isSpotify
-                    ? 'Please enter a valid Spotify playlist or show URL (e.g. https://open.spotify.com/playlist/abc123)'
-                    : 'Please enter a valid Tally URL (e.g. https://tally.so/r/abc123)'}
+                  Please enter a valid Tally URL (e.g. https://tally.so/r/abc123)
                 </div>
               )}
             </div>
@@ -118,7 +86,7 @@ export function useEmbedTab({ tab, onSave }: TabHookProps): TabHookResult {
 
   // Preview — use saved embed URL, or fall back to live-computed embed URL
   const previewUrl = savedEmbedUrl || embedUrl
-  const proxyUrl = previewUrl ? getProxyUrl(isSpotify ? 'Spotify' : 'Tally', previewUrl) : ''
+  const proxyUrl = previewUrl ? getProxyUrl(previewUrl) : ''
 
   const preview = (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
@@ -132,7 +100,7 @@ export function useEmbedTab({ tab, onSave }: TabHookProps): TabHookResult {
         />
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999', fontSize: 14 }}>
-          {isSpotify ? 'Enter a Spotify playlist or show URL and save to see a preview' : 'Enter a Tally form URL and save to see a preview'}
+          Enter a Tally form URL and save to see a preview
         </div>
       )}
     </div>
