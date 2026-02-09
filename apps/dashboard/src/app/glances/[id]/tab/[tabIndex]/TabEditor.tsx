@@ -38,7 +38,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   const isTldrTab = tabType === 'TLDR' || tabType === 'Content' || tabType === 'Static Content'
   const isFormTab = tabType === 'Form'
   const isChatTab = tabType === 'AI Chat'
-  const isEmbedTab = tabType === 'Tally'
+  const isEmbedTab = tabType === 'Tally' || tabType === 'Spotify'
 
   // ===== Shared state =====
   const slugify = (text: string) =>
