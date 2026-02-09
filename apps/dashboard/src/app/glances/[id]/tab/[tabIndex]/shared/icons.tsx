@@ -67,6 +67,8 @@ export interface TabHookProps {
   themeColor: string
   tabs: any[]
   workspaceId?: string
+  /** Live premium toggle state from TabEditor */
+  isPremium?: boolean
   /** Called by sub-editor when it computes its save payload */
   onSave: (payload: Record<string, any>) => Promise<void>
   saving: boolean

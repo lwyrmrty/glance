@@ -34,7 +34,9 @@ export async function GET(request: NextRequest) {
 
       var wrapper = document.createElement('div');
       el.shadowRoot.querySelectorAll(':not(style)').forEach(function(node) {
-        wrapper.appendChild(node.cloneNode(true));
+        // Shallow-clone nodes that contain iframes to avoid reload loops (Tally, etc.)
+        var hasIframe = node.tagName === 'IFRAME' || (node.querySelector && node.querySelector('iframe'));
+        wrapper.appendChild(node.cloneNode(!hasIframe));
       });
 
       window.parent.postMessage({

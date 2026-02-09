@@ -9,7 +9,7 @@ interface ChatTabHookProps extends TabHookProps {
   knowledgeSources: KnowledgeSourceSummary[]
 }
 
-export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, knowledgeSources, workspaceId }: ChatTabHookProps): TabHookResult {
+export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, knowledgeSources, workspaceId, isPremium }: ChatTabHookProps): TabHookResult {
   const knowledgePrefix = workspaceId ? `/w/${workspaceId}` : ''
   // Saved values for change detection
   const savedWelcome = tab.welcome_message ?? ''
@@ -153,19 +153,23 @@ export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                     value={welcomeMessage}
                     onChange={(e) => setWelcomeMessage(e.target.value)}
                   ></textarea>
-                  <div className="spacer10"></div>
-                  <div className="alignrow aligncenter">
-                    <div className="labeltext dim">User Variables:</div>
-                    <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertVariable('first_name') }}>
-                      <div>First Name</div>
-                    </a>
-                    <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertVariable('last_name') }}>
-                      <div>Last Name</div>
-                    </a>
-                    <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertVariable('email') }}>
-                      <div>Email Address</div>
-                    </a>
-                  </div>
+                  {isPremium && (
+                    <>
+                      <div className="spacer10"></div>
+                      <div className="alignrow aligncenter">
+                        <div className="labeltext dim">User Variables:</div>
+                        <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertVariable('first_name') }}>
+                          <div>First Name</div>
+                        </a>
+                        <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertVariable('last_name') }}>
+                          <div>Last Name</div>
+                        </a>
+                        <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertVariable('email') }}>
+                          <div>Email Address</div>
+                        </a>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -247,18 +251,20 @@ export function useChatTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                 <div>
                   <textarea ref={failureRef} placeholder="" maxLength={5000} className="formfields message _100 w-input" style={{ lineHeight: '1.5em' }} value={failureMessage} onChange={(e) => setFailureMessage(e.target.value)}></textarea>
                 </div>
-                <div className="alignrow aligncenter">
-                  <div className="labeltext dim">User Variables:</div>
-                  <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertFailureVariable('first_name') }}>
-                    <div>First Name</div>
-                  </a>
-                  <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertFailureVariable('last_name') }}>
-                    <div>Last Name</div>
-                  </a>
-                  <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertFailureVariable('email') }}>
-                    <div>Email Address</div>
-                  </a>
-                </div>
+                {isPremium && (
+                  <div className="alignrow aligncenter">
+                    <div className="labeltext dim">User Variables:</div>
+                    <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertFailureVariable('first_name') }}>
+                      <div>First Name</div>
+                    </a>
+                    <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertFailureVariable('last_name') }}>
+                      <div>Last Name</div>
+                    </a>
+                    <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertFailureVariable('email') }}>
+                      <div>Email Address</div>
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </form>

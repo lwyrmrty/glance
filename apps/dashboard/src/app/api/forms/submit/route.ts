@@ -88,23 +88,31 @@ export async function POST(request: NextRequest) {
     for (const field of formFields) {
       const value = formData.get(field.label)
 
-      if (field.type === 'File Upload' && value instanceof File && value.size > 0) {
-        // Upload file to form-uploads bucket
-        const ext = value.name.split('.').pop() || 'bin'
-        const storagePath = `${widgetId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      if (field.type === 'File Upload') {
+        // Check for pre-uploaded file URL (direct-to-storage upload)
+        const preUploadedUrl = formData.get(field.label + '__url') as string | null
+        if (preUploadedUrl) {
+          fileUrls[field.label] = preUploadedUrl
+          data[field.label] = typeof value === 'string' ? value : ''
+        } else if (value instanceof File && value.size > 0) {
+          // Legacy path: upload file through the server
+          const ext = value.name.split('.').pop() || 'bin'
+          const storagePath = `${widgetId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
-        const { error: uploadError } = await supabase.storage
-          .from('form-uploads')
-          .upload(storagePath, value, { upsert: true })
-
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from('form-uploads')
-            .getPublicUrl(storagePath)
-          fileUrls[field.label] = urlData.publicUrl
+            .upload(storagePath, value, { upsert: true })
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage
+              .from('form-uploads')
+              .getPublicUrl(storagePath)
+            fileUrls[field.label] = urlData.publicUrl
+          }
+          data[field.label] = value.name
+        } else {
+          data[field.label] = typeof value === 'string' ? value : ''
         }
-        // Store original filename in data
-        data[field.label] = value.name
       } else if (typeof value === 'string') {
         data[field.label] = value
       } else {

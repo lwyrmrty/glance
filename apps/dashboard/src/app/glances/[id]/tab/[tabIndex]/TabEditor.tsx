@@ -10,6 +10,7 @@ import { type KnowledgeSourceSummary } from './shared/icons'
 import { useChatTab } from './ChatTabEditor'
 import { useFormTab, type FormTabHookResult } from './FormTabEditor'
 import { useTldrTab } from './TldrTabEditor'
+import { useEmbedTab } from './EmbedTabEditor'
 
 interface TabEditorProps {
   glanceId: string
@@ -37,6 +38,7 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   const isTldrTab = tabType === 'TLDR' || tabType === 'Content' || tabType === 'Static Content'
   const isFormTab = tabType === 'Form'
   const isChatTab = tabType === 'AI Chat'
+  const isEmbedTab = tabType === 'Tally'
 
   // ===== Shared state =====
   const slugify = (text: string) =>
@@ -89,14 +91,15 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   }
 
   // ===== Call all three hooks unconditionally (React hooks rules) =====
-  const hookProps = { tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, workspaceId }
+  const hookProps = { tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, workspaceId, isPremium }
 
   const chatTab = useChatTab({ ...hookProps, knowledgeSources })
   const formTab = useFormTab(hookProps)
   const tldrTab = useTldrTab(hookProps)
+  const embedTab = useEmbedTab(hookProps)
 
   // ===== Active sub-editor =====
-  const activeTab = isChatTab ? chatTab : isFormTab ? formTab : tldrTab
+  const activeTab = isChatTab ? chatTab : isFormTab ? formTab : isEmbedTab ? embedTab : tldrTab
 
   // Combined change detection
   const sharedHasChanges = hashTrigger !== (savedHashTrigger || autoHash) || isPremium !== savedPremium
@@ -163,6 +166,15 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
                         onClick={(e) => { e.preventDefault(); setFormView('submissions'); if (submissions.length === 0) loadSubmissions() }}
                       >
                         <div>Submissions</div>
+                      </a>
+                      <a href="#" className="innerhero-nav-link w-inline-block">
+                        <div>Analytics</div>
+                      </a>
+                    </>
+                  ) : isEmbedTab ? (
+                    <>
+                      <a href="#" className="innerhero-nav-link active w-inline-block">
+                        <div>Embed Settings</div>
                       </a>
                       <a href="#" className="innerhero-nav-link w-inline-block">
                         <div>Analytics</div>

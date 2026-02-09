@@ -15,7 +15,7 @@ export interface FormTabHookResult extends TabHookResult {
   submissionsPanel: React.ReactNode
 }
 
-export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving }: TabHookProps): FormTabHookResult {
+export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving, isPremium }: TabHookProps): FormTabHookResult {
   const tabName = tab.name || 'Untitled Tab'
 
   // Saved values
@@ -186,6 +186,23 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     a.download = `${tabName.replace(/\s+/g, '-').toLowerCase()}-submissions.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Success message ref + variable insertion
+  const successMessageRef = useRef<HTMLTextAreaElement>(null)
+  const insertSuccessVariable = (variable: string) => {
+    const textarea = successMessageRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const token = `{{${variable}}}`
+    const newValue = formSuccessMessage.slice(0, start) + token + formSuccessMessage.slice(end)
+    setFormSuccessMessage(newValue)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      const cursorPos = start + token.length
+      textarea.setSelectionRange(cursorPos, cursorPos)
+    })
   }
 
   // Banner upload
@@ -482,6 +499,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                     </div>
                     <div>
                       <textarea
+                        ref={successMessageRef}
                         placeholder="Thank you! Your submission has been received."
                         maxLength={5000}
                         className="formfields message _100 w-input"
@@ -489,6 +507,20 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                         onChange={(e) => setFormSuccessMessage(e.target.value)}
                       ></textarea>
                     </div>
+                    {isPremium && (
+                      <div className="alignrow aligncenter">
+                        <div className="labeltext dim">User Variables:</div>
+                        <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertSuccessVariable('first_name') }}>
+                          <div>First Name</div>
+                        </a>
+                        <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertSuccessVariable('last_name') }}>
+                          <div>Last Name</div>
+                        </a>
+                        <a href="#" className="calloutpill w-inline-block" onClick={(e) => { e.preventDefault(); insertSuccessVariable('email') }}>
+                          <div>Email Address</div>
+                        </a>
+                      </div>
+                    )}
                   </div>
                   <div className="fieldblocks">
                     <div className="fieldblocks">
@@ -692,7 +724,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                     </svg>
                     <div>
                       <div>Upload</div>
-                      <div className="uploadlabel">Up to 50MB</div>
+                      <div className="uploadlabel">Up to 20MB</div>
                     </div>
                   </div>
                 ) : f.type === 'Checkbox(es)' ? (
