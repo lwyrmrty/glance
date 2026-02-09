@@ -4,7 +4,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
-import { useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 
 interface RichTextFieldProps {
   value: string
@@ -107,20 +107,12 @@ export function RichTextField({ value, onChange, placeholder = '', height = 300,
     },
   })
 
-  // Sync external value changes (e.g., loading saved data)
-  const syncContent = useCallback(() => {
-    if (editor && value !== editor.getHTML()) {
+  // Sync external value changes (e.g., switching between sources)
+  useEffect(() => {
+    if (editor && !editor.isFocused && value !== editor.getHTML()) {
       editor.commands.setContent(value || '')
     }
   }, [editor, value])
-
-  useEffect(() => {
-    // Only sync on initial load, not on every keystroke
-    if (editor && !editor.isFocused) {
-      syncContent()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor])
 
   return (
     <div className="tiptap-wrapper">
