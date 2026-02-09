@@ -10,7 +10,6 @@ import { type KnowledgeSourceSummary } from './shared/icons'
 import { useChatTab } from './ChatTabEditor'
 import { useFormTab, type FormTabHookResult } from './FormTabEditor'
 import { useTldrTab } from './TldrTabEditor'
-import { useEmbedTab } from './EmbedTabEditor'
 
 interface TabEditorProps {
   glanceId: string
@@ -38,7 +37,6 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   const isTldrTab = tabType === 'TLDR' || tabType === 'Content' || tabType === 'Static Content'
   const isFormTab = tabType === 'Form'
   const isChatTab = tabType === 'AI Chat'
-  const isEmbedTab = tabType === 'Tally'
 
   // ===== Shared state =====
   const slugify = (text: string) =>
@@ -96,10 +94,9 @@ export default function TabEditor({ glanceId, tabIndex, glance, knowledgeSources
   const chatTab = useChatTab({ ...hookProps, knowledgeSources })
   const formTab = useFormTab(hookProps)
   const tldrTab = useTldrTab(hookProps)
-  const embedTab = useEmbedTab(hookProps)
 
   // ===== Active sub-editor =====
-  const activeTab = isChatTab ? chatTab : isFormTab ? formTab : isEmbedTab ? embedTab : tldrTab
+  const activeTab = isChatTab ? chatTab : isFormTab ? formTab : tldrTab
 
   // Combined change detection
   const sharedHasChanges = hashTrigger !== (savedHashTrigger || autoHash) || isPremium !== savedPremium

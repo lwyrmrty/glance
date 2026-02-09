@@ -133,7 +133,6 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
     'Ashby': { img: '/images/Wf_LJXhG_400x400.png', className: 'fullimage' },
     'Greenhouse': { img: '/images/V7s98SAp_400x400.jpg', className: 'fullimage' },
     'Lever': { img: '/images/lever__logo.jpeg', className: 'fullimage' },
-    'Tally': { img: '/images/V3mlVijc_400x400.jpg', className: 'fullimage' },
   }
 
   const selectWidgetType = (index: number, type: string) => {
@@ -557,7 +556,6 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
                                           { name: 'Ashby', img: '/images/Wf_LJXhG_400x400.png' },
                                           { name: 'Greenhouse', img: '/images/V7s98SAp_400x400.jpg' },
                                           { name: 'Lever', img: '/images/lever__logo.jpeg' },
-                                          { name: 'Tally', img: '/images/V3mlVijc_400x400.jpg' },
                                         ].map((w) => (
                                           <a key={w.name} href="#" className={`widgetpill w-inline-block${tab.type === w.name ? ' active' : ''}`} onClick={(e) => { e.preventDefault(); selectWidgetType(index, w.name) }}>
                                             <div className="alignrow aligncenter">
