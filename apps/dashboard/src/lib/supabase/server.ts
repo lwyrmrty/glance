@@ -20,6 +20,9 @@ export async function createClient() {
           } catch {}
         },
       },
+      global: {
+        fetch: (url, options) => fetch(url, { ...options, cache: 'no-store' }),
+      },
     }
   )
 }
