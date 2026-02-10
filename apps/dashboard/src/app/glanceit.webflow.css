@@ -4157,6 +4157,39 @@ button:disabled,
   display: flex;
 }
 
+/* Theme color background variant for content link cards */
+.content-card-theme.contenttype .content-row-link,
+.content-card-theme.contenttype .content-stack-link,
+.content-card-theme.contenttype .content-quote {
+  background-color: var(--vcs-purple);
+  border-color: var(--vcs-purple);
+  color: #fff;
+}
+.content-card-theme.contenttype .content-row-subheader,
+.content-card-theme.contenttype .content-stack-subheader,
+.content-card-theme.contenttype .content-quote-title {
+  color: rgba(255, 255, 255, 0.85);
+}
+.content-card-theme.contenttype .galleryimage {
+  border-color: var(--vcs-purple);
+}
+
+.content-card-black.contenttype .content-row-link,
+.content-card-black.contenttype .content-stack-link,
+.content-card-black.contenttype .content-quote {
+  background-color: #111;
+  border-color: #111;
+  color: #fff;
+}
+.content-card-black.contenttype .content-row-subheader,
+.content-card-black.contenttype .content-stack-subheader,
+.content-card-black.contenttype .content-quote-title {
+  color: rgba(255, 255, 255, 0.85);
+}
+.content-card-black.contenttype .galleryimage {
+  border-color: #111;
+}
+
 .text-block-2 {
   font-size: 16px;
   font-weight: 400;

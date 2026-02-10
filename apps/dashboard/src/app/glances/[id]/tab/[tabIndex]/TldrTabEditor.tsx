@@ -6,6 +6,8 @@ import { dragIconSvg, uploadIconSvg, socialPlatforms, type TabHookProps, type Ta
 
 type ContentType = 'row' | 'stack' | 'quote' | 'photo' | 'video'
 
+type CardBackgroundStyle = 'white' | 'theme' | 'black'
+
 type ContentLink = {
   content_type?: ContentType
   title?: string
@@ -20,6 +22,7 @@ type ContentLink = {
   imageLink?: string
   aspectRatio?: string
   videoUrl?: string
+  card_background_style?: CardBackgroundStyle
 }
 
 const contentTypeIcons: Record<ContentType, React.ReactNode> = {
@@ -28,6 +31,29 @@ const contentTypeIcons: Record<ContentType, React.ReactNode> = {
   quote: <img src="/images/quote.svg" alt="" width={18} height={18} />,
   photo: <img src="/images/gallerydark.svg" alt="" width={18} height={18} />,
   video: <img src="/images/video.svg" alt="" width={18} height={18} />,
+}
+
+const backgroundStyleLabels: Record<CardBackgroundStyle, string> = {
+  white: 'White',
+  theme: 'Theme Color',
+  black: 'Black',
+}
+
+function BackgroundStyleIcon({ style, themeColor }: { style: CardBackgroundStyle; themeColor: string }) {
+  const bgColor = style === 'theme' ? themeColor : style === 'black' ? '#111' : '#fff'
+  const borderColor = style === 'theme' ? themeColor : style === 'black' ? '#111' : '#e2e7de'
+  return (
+    <div
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        backgroundColor: bgColor,
+        border: `1.5px solid ${borderColor}`,
+        flexShrink: 0,
+      }}
+    />
+  )
 }
 
 const normalizeContentLinks = (links: ContentLink[]) =>
@@ -45,6 +71,7 @@ const normalizeContentLinks = (links: ContentLink[]) =>
     imageLink: link.imageLink || '',
     aspectRatio: link.aspectRatio || '',
     videoUrl: link.videoUrl || '',
+    card_background_style: link.card_background_style || 'white',
   }))
 
 export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, tabs, onSave, saving }: TabHookProps): TabHookResult {
@@ -77,12 +104,14 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const [contentDragIndex, setContentDragIndex] = useState<number | null>(null)
   const [contentDragOverIndex, setContentDragOverIndex] = useState<number | null>(null)
   const [openContentTypeDropdown, setOpenContentTypeDropdown] = useState<number | null>(null)
+  const [openBackgroundDropdown, setOpenBackgroundDropdown] = useState<number | null>(null)
 
   // Refs
   const bannerInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const contentImageRefs = useRef<(HTMLInputElement | null)[]>([])
   const contentTypeDropdownRef = useRef<HTMLDivElement>(null)
+  const backgroundDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (openContentTypeDropdown === null) return
@@ -94,6 +123,17 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [openContentTypeDropdown])
+
+  useEffect(() => {
+    if (openBackgroundDropdown === null) return
+    const handler = (e: MouseEvent) => {
+      if (backgroundDropdownRef.current && !backgroundDropdownRef.current.contains(e.target as Node)) {
+        setOpenBackgroundDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openBackgroundDropdown])
 
   // File refs for actual upload on save
   const bannerFileRef = useRef<File | null>(null)
@@ -154,6 +194,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
       imageLink: '',
       aspectRatio: '',
       videoUrl: '',
+      card_background_style: 'white',
     }])
   }
   const updateContentLink = (index: number, field: keyof ContentLink, value: string) => {
@@ -446,53 +487,107 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                       <div className="alignrow aligncenter stretch">
                         <div className="draggingblock moved">{dragIconSvg}</div>
                         <div className="prompt-block">
-                          <div className="filterswrapper filterswrapper-full" ref={openContentTypeDropdown === i ? contentTypeDropdownRef : undefined}>
-                            <a
-                              href="#"
-                              className={`dropdownbuttons dropdownbuttons-full ${activeType ? '' : 'empty'} w-inline-block`}
-                              onClick={(e) => { e.preventDefault(); setOpenContentTypeDropdown(openContentTypeDropdown === i ? null : i) }}
-                            >
-                              <div className="alignrow aligncenter">
-                                <div className="navbarlink-icon sm">
-                                  {contentTypeIcons[activeType]}
-                                </div>
-                                <div>{activeType.charAt(0).toUpperCase() + activeType.slice(1)}</div>
-                              </div>
-                              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="dropdowntoggle" style={{ transform: openContentTypeDropdown === i ? 'rotate(90deg)' : undefined, transition: 'transform 0.2s' }}>
-                                <path d="M10 8L14 12L10 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </a>
-                            {openContentTypeDropdown === i && (
-                              <div className="widgetsmodal" style={{ display: 'flex', position: 'absolute', inset: 'auto', right: 0, top: '100%', zIndex: 50, minWidth: 200, height: 'auto' }}>
-                                <div className="widgetsmodal-block">
-                                  <div className="labelrow">
-                                    <div className="labeltext">Content Type</div>
-                                    <div className="labeldivider" />
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                            <div className="filterswrapper filterswrapper-full" ref={openContentTypeDropdown === i ? contentTypeDropdownRef : undefined}>
+                              <a
+                                href="#"
+                                className={`dropdownbuttons dropdownbuttons-full ${activeType ? '' : 'empty'} w-inline-block`}
+                                onClick={(e) => { e.preventDefault(); setOpenContentTypeDropdown(openContentTypeDropdown === i ? null : i) }}
+                              >
+                                <div className="alignrow aligncenter">
+                                  <div className="navbarlink-icon sm">
+                                    {contentTypeIcons[activeType]}
                                   </div>
-                                  <div className="pillswrapper">
-                                    {(['row', 'stack', 'quote', 'photo', 'video'] as ContentType[]).map((type) => (
-                                      <a
-                                        key={type}
-                                        href="#"
-                                        className={`widgetpill w-inline-block${activeType === type ? ' active' : ''}`}
-                                        onClick={(e) => {
-                                          e.preventDefault()
-                                          updateContentType(i, type)
-                                          setOpenContentTypeDropdown(null)
-                                        }}
-                                      >
-                                        <div className="alignrow aligncenter">
-                                          <div className="navbarlink-icon sm">
-                                            {contentTypeIcons[type]}
+                                  <div>{activeType.charAt(0).toUpperCase() + activeType.slice(1)}</div>
+                                </div>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="dropdowntoggle" style={{ transform: openContentTypeDropdown === i ? 'rotate(90deg)' : undefined, transition: 'transform 0.2s' }}>
+                                  <path d="M10 8L14 12L10 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </a>
+                              {openContentTypeDropdown === i && (
+                                <div className="widgetsmodal" style={{ display: 'flex', position: 'absolute', inset: 'auto', right: 0, top: '100%', zIndex: 50, minWidth: 200, height: 'auto' }}>
+                                  <div className="widgetsmodal-block">
+                                    <div className="labelrow">
+                                      <div className="labeltext">Content Type</div>
+                                      <div className="labeldivider" />
+                                    </div>
+                                    <div className="pillswrapper">
+                                      {(['row', 'stack', 'quote', 'photo', 'video'] as ContentType[]).map((type) => (
+                                        <a
+                                          key={type}
+                                          href="#"
+                                          className={`widgetpill w-inline-block${activeType === type ? ' active' : ''}`}
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            updateContentType(i, type)
+                                            setOpenContentTypeDropdown(null)
+                                          }}
+                                        >
+                                          <div className="alignrow aligncenter">
+                                            <div className="navbarlink-icon sm">
+                                              {contentTypeIcons[type]}
+                                            </div>
+                                            <div>{type.charAt(0).toUpperCase() + type.slice(1)}</div>
                                           </div>
-                                          <div>{type.charAt(0).toUpperCase() + type.slice(1)}</div>
-                                        </div>
-                                      </a>
-                                    ))}
+                                        </a>
+                                      ))}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
+
+                            <div className="filterswrapper filterswrapper-full" ref={openBackgroundDropdown === i ? backgroundDropdownRef : undefined}>
+                              <a
+                                href="#"
+                                className="dropdownbuttons dropdownbuttons-full w-inline-block"
+                                onClick={(e) => { e.preventDefault(); setOpenBackgroundDropdown(openBackgroundDropdown === i ? null : i) }}
+                              >
+                                <div className="alignrow aligncenter">
+                                  <div className="navbarlink-icon sm">
+                                    <BackgroundStyleIcon style={(cl.card_background_style || 'white') as CardBackgroundStyle} themeColor={themeColor} />
+                                  </div>
+                                  <div>{backgroundStyleLabels[(cl.card_background_style || 'white') as CardBackgroundStyle]}</div>
+                                </div>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="dropdowntoggle" style={{ transform: openBackgroundDropdown === i ? 'rotate(90deg)' : undefined, transition: 'transform 0.2s' }}>
+                                  <path d="M10 8L14 12L10 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </a>
+                              {openBackgroundDropdown === i && (
+                                <div className="widgetsmodal" style={{ display: 'flex', position: 'absolute', inset: 'auto', right: 0, top: '100%', zIndex: 50, minWidth: 200, height: 'auto' }}>
+                                  <div className="widgetsmodal-block">
+                                    <div className="labelrow">
+                                      <div className="labeltext">Card Background</div>
+                                      <div className="labeldivider" />
+                                    </div>
+                                    <div className="pillswrapper">
+                                      {(['white', 'theme', 'black'] as CardBackgroundStyle[]).map((style) => {
+                                        const isSelected = (cl.card_background_style || 'white') === style
+                                        return (
+                                          <a
+                                            key={style}
+                                            href="#"
+                                            className={`widgetpill w-inline-block${isSelected ? ' active' : ''}`}
+                                            onClick={(e) => {
+                                              e.preventDefault()
+                                              updateContentLink(i, 'card_background_style', style)
+                                              setOpenBackgroundDropdown(null)
+                                            }}
+                                          >
+                                            <div className="alignrow aligncenter">
+                                              <div className="navbarlink-icon sm">
+                                                <BackgroundStyleIcon style={style} themeColor={themeColor} />
+                                              </div>
+                                              <div>{backgroundStyleLabels[style]}</div>
+                                            </div>
+                                          </a>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div content-type="video" className="contenttype-block" style={{ display: activeType === 'video' ? 'flex' : 'none' }}>
@@ -917,9 +1012,12 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
         <div className="content-rows">
           {tldrContentLinks.map((cl, i) => {
             const contentType = cl.content_type || 'row'
+            const isThemeBg = cl.card_background_style === 'theme'
+            const isBlackBg = cl.card_background_style === 'black'
+            const contenttypeClass = `contenttype${isThemeBg ? ' content-card-theme' : ''}${isBlackBg ? ' content-card-black' : ''}`
             if (contentType === 'row') {
               return (
-                <div key={i} content-type="row" className="contenttype">
+                <div key={i} content-type="row" className={contenttypeClass}>
                   <a href="#" className="content-row-link w-inline-block" onClick={(e) => e.preventDefault()}>
                     {cl.imageUrl ? (
                       <div className="content-row-image">
@@ -940,7 +1038,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
             }
             if (contentType === 'stack') {
               return (
-                <div key={i} content-type="stack" className="contenttype">
+                <div key={i} content-type="stack" className={contenttypeClass}>
                   <a href="#" className="content-stack-link w-inline-block" onClick={(e) => e.preventDefault()}>
                     <div className="content-stack-image" style={{ aspectRatio: aspectRatioValue(cl.aspectRatio) }}>
                       {cl.imageUrl ? (
@@ -959,7 +1057,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
             }
             if (contentType === 'quote') {
               return (
-                <div key={i} content-type="quote" className="contenttype">
+                <div key={i} content-type="quote" className={contenttypeClass}>
                   <div className="content-quote">
                     <div className="content-quote-wrapper">
                       <div className="text-block-2">{cl.quoteText || 'Quote text goes here.'}</div>
@@ -983,7 +1081,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
             }
             if (contentType === 'photo') {
               return (
-                <div key={i} content-type="photo" className="contenttype">
+                <div key={i} content-type="photo" className={contenttypeClass}>
                   <div className="galleryimage" style={{ aspectRatio: aspectRatioValue(cl.aspectRatio) }}>
                     {cl.imageUrl ? (
                       <img src={cl.imageUrl} alt="" className="full-image" loading="lazy" />
@@ -1001,7 +1099,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
             }
             if (contentType === 'video') {
               return (
-                <div key={i} content-type="video" className="contenttype">
+                <div key={i} content-type="video" className={contenttypeClass}>
                   <div className="videowrapper">
                     <div style={{ paddingTop: '56.17021276595745%' }} className="w-video w-embed">
                       <iframe
