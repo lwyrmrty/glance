@@ -2,16 +2,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 // CORS — widget fires from external sites; reflect Origin when provided
-// (required when browser sends credentials; * is forbidden with credentials)
+// When browser sends credentials, we must reflect Origin and set Allow-Credentials
 function corsHeaders(request: Request) {
   const origin = request.headers.get('Origin')
-  const allowOrigin =
-    origin && /^https?:\/\//.test(origin) ? origin : '*'
-  return {
+  const hasOrigin = origin && /^https?:\/\//.test(origin)
+  const allowOrigin = hasOrigin ? origin : '*'
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   }
+  if (hasOrigin) {
+    headers['Access-Control-Allow-Credentials'] = 'true'
+  }
+  return headers
 }
 
 export async function OPTIONS(request: NextRequest) {
