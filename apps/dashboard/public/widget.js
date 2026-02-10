@@ -875,6 +875,7 @@
 
 /* Auth gate styles */
 .widget-content.account { display: flex; flex-direction: column; padding: 10px 10px 0; }
+.widget-content.account .tabhero { padding-left: 5px; padding-right: 5px; }
 .widget-content.account .tabheading-wrap.center { text-align: center; padding-left: 20px; padding-right: 20px; }
 .widget-content.account .tab-heading { font-size: 21px; margin-top: 7px; margin-bottom: 5px; }
 .widget-content.account .tab-subheading { margin-bottom: 7px; }
