@@ -29,6 +29,43 @@ interface GlanceEditorProps {
   glances?: Array<{ id: string; name: string; logo_url?: string | null }>
 }
 
+function PromptsWithDismiss({ prompts, glanceId }: { prompts: { text: string; link: string }[]; glanceId: string }) {
+  const storageKey = `glance_prompts_hidden_preview_${glanceId}`
+  const [hidden, setHidden] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return !!sessionStorage.getItem(storageKey)
+  })
+  if (hidden) return null
+  const filtered = prompts.filter(p => p.text.trim())
+  if (filtered.length === 0) return null
+  return (
+    <div className="glanceprompts-wrap">
+      <button
+        type="button"
+        className="glanceprompts-dismiss"
+        aria-label="Dismiss suggested prompts"
+        style={{
+          opacity: 0,
+          animation: `glancePromptSlideIn 0.4s ease-out ${1200 + (filtered.length - 1) * 200 + 200}ms forwards`,
+        }}
+        onClick={() => {
+          sessionStorage.setItem(storageKey, '1')
+          setHidden(true)
+        }}
+      >
+        ×
+      </button>
+      <div className="glanceprompts">
+        {filtered.map((prompt, index) => (
+          <a key={index} href={prompt.link || '#'} className="glanceprompt w-inline-block" onClick={(e) => e.preventDefault()}>
+            <div>{prompt.text}</div>
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function GlanceEditor({ glanceId, workspaceId, workspaceName, glance, glances = [] }: GlanceEditorProps) {
   const isNew = glanceId === 'new'
   const router = useRouter()
@@ -829,13 +866,7 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
                   </div>
                   </div>
                   {prompts.some(p => p.text.trim()) && (
-                    <div className="glanceprompts">
-                      {prompts.filter(p => p.text.trim()).map((prompt, index) => (
-                        <a key={index} href={prompt.link || '#'} className="glanceprompt w-inline-block" onClick={(e) => e.preventDefault()}>
-                          <div>{prompt.text}</div>
-                        </a>
-                      ))}
-                    </div>
+                    <PromptsWithDismiss prompts={prompts} glanceId={glanceId} />
                   )}
                   <div className="glancebutton-row">
                     {calloutText && (

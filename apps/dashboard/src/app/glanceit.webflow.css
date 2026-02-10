@@ -3341,6 +3341,31 @@ em {
   height: 25px;
 }
 
+.glanceprompts-wrap {
+  flex-flow: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  display: flex;
+}
+.glanceprompts-dismiss {
+  width: 25px;
+  height: 25px;
+  padding-top: 1px;
+  border: 1px solid color-mix(in srgb, var(--vcs-purple) 10%, transparent);
+  background: rgba(255,255,255,0.25);
+  border-radius: 100%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  margin-bottom: 6px;
+  transition: background 0.2s, color 0.2s;
+  color: color-mix(in srgb, var(--vcs-purple) 50%, transparent);
+  font-size: 19px;
+  line-height: 1;
+}
+.glanceprompts-dismiss:hover { background: #fff; color: var(--vcs-purple); }
 .glanceprompts {
   grid-column-gap: 5px;
   grid-row-gap: 5px;
