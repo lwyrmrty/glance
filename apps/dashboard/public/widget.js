@@ -484,8 +484,8 @@
 .social-ico { width: 18px; height: 18px; }
 
 .content-rows {
-  grid-column-gap: 5px;
-  grid-row-gap: 5px;
+  grid-column-gap: 7px;
+  grid-row-gap: 7px;
   flex-flow: column;
   display: flex;
 }
