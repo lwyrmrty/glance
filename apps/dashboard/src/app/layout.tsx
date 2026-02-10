@@ -14,6 +14,9 @@ const figtree = Figtree({
 export const metadata: Metadata = {
   title: 'Glance Dashboard',
   description: 'Glance widget management dashboard',
+  icons: {
+    icon: '/favicon.png',
+  },
 }
 
 export default function RootLayout({

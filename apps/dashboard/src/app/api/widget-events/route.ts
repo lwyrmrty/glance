@@ -1,15 +1,21 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
-// CORS headers — the widget fires events from external sites
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+// CORS — widget fires from external sites; reflect Origin when provided
+// (required when browser sends credentials; * is forbidden with credentials)
+function corsHeaders(request: Request) {
+  const origin = request.headers.get('Origin')
+  const allowOrigin =
+    origin && /^https?:\/\//.test(origin) ? origin : '*'
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  }
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders })
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(request) })
 }
 
 interface WidgetEvent {
@@ -49,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (!widget_id || !session_id || !Array.isArray(events) || events.length === 0) {
       return NextResponse.json(
         { error: 'Missing widget_id, session_id, or events array' },
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders(request) }
       )
     }
 
@@ -73,7 +79,7 @@ export async function POST(request: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json(
         { error: 'No valid events to insert' },
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: corsHeaders(request) }
       )
     }
 
@@ -85,19 +91,19 @@ export async function POST(request: NextRequest) {
       console.error('[Glance] Widget events insert error:', insertError)
       return NextResponse.json(
         { error: 'Failed to save events' },
-        { status: 500, headers: corsHeaders }
+        { status: 500, headers: corsHeaders(request) }
       )
     }
 
     return NextResponse.json(
       { success: true, count: rows.length },
-      { headers: corsHeaders }
+      { headers: corsHeaders(request) }
     )
   } catch (err) {
     console.error('[Glance] Widget events error:', err)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: corsHeaders(request) }
     )
   }
 }
