@@ -586,7 +586,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                               <div className="labeltext">Links:</div>
                               {tabLinkNames.map((tn: string) => {
                                 const hash = `#glance-${tn.toLowerCase().replace(/\s+/g, '-')}`
-                                const isSelected = cl.tabLink === hash
+                                const isSelected = cl.tabLink === hash || cl.imageLink === hash
                                 return (
                                   <a
                                     key={tn}
@@ -594,7 +594,9 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                                     className={`calloutpill w-inline-block${isSelected ? ' selected' : ''}`}
                                     onClick={(e) => {
                                       e.preventDefault()
-                                      updateContentLink(i, 'tabLink', isSelected ? '' : hash)
+                                      const newVal = isSelected ? '' : hash
+                                      updateContentLink(i, 'tabLink', newVal)
+                                      updateContentLink(i, 'imageLink', newVal)
                                     }}
                                   >
                                     <div>{tn}</div>
@@ -661,7 +663,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                               <div className="labeltext">Tab Links:</div>
                               {tabLinkNames.map((tn: string) => {
                                 const hash = `#glance-${tn.toLowerCase().replace(/\s+/g, '-')}`
-                                const isSelected = cl.tabLink === hash
+                                const isSelected = cl.tabLink === hash || cl.link === hash
                                 return (
                                   <a
                                     key={tn}
@@ -669,7 +671,9 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                                     className={`calloutpill w-inline-block${isSelected ? ' selected' : ''}`}
                                     onClick={(e) => {
                                       e.preventDefault()
-                                      updateContentLink(i, 'tabLink', isSelected ? '' : hash)
+                                      const newVal = isSelected ? '' : hash
+                                      updateContentLink(i, 'tabLink', newVal)
+                                      updateContentLink(i, 'link', newVal)
                                     }}
                                   >
                                     <div>{tn}</div>
@@ -766,7 +770,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                               <div className="labeltext">Tab Links:</div>
                               {tabLinkNames.map((tn: string) => {
                                 const hash = `#glance-${tn.toLowerCase().replace(/\s+/g, '-')}`
-                                const isSelected = cl.tabLink === hash
+                                const isSelected = cl.tabLink === hash || cl.link === hash
                                 return (
                                   <a
                                     key={tn}
@@ -774,7 +778,9 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                                     className={`calloutpill w-inline-block${isSelected ? ' selected' : ''}`}
                                     onClick={(e) => {
                                       e.preventDefault()
-                                      updateContentLink(i, 'tabLink', isSelected ? '' : hash)
+                                      const newVal = isSelected ? '' : hash
+                                      updateContentLink(i, 'tabLink', newVal)
+                                      updateContentLink(i, 'link', newVal)
                                     }}
                                   >
                                     <div>{tn}</div>
