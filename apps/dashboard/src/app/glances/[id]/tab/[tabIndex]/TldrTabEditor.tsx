@@ -54,6 +54,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const savedTldrTitle = (tab as any).tldr_title ?? ''
   const savedTldrSubtitle = (tab as any).tldr_subtitle ?? ''
   const savedBannerUrl = (tab as any).tldr_banner_url ?? null
+  const savedBannerAspectRatio = (tab as any).tldr_banner_aspect_ratio ?? ''
   const savedLogoUrl = (tab as any).tldr_logo_url ?? null
   const savedSocials = (tab as any).tldr_socials ?? [
     { platform: 'linkedin', url: '' },
@@ -69,6 +70,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const [tldrTitle, setTldrTitle] = useState(savedTldrTitle)
   const [tldrSubtitle, setTldrSubtitle] = useState(savedTldrSubtitle)
   const [tldrBannerPreview, setTldrBannerPreview] = useState<string | null>(savedBannerUrl)
+  const [tldrBannerAspectRatio, setTldrBannerAspectRatio] = useState(savedBannerAspectRatio)
   const [tldrLogoPreview, setTldrLogoPreview] = useState<string | null>(savedLogoUrl)
   const [tldrSocials, setTldrSocials] = useState<{ platform: string; url: string }[]>(savedSocials)
   const [tldrContentLinks, setTldrContentLinks] = useState<ContentLink[]>(savedContentLinks)
@@ -103,9 +105,6 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const aspectRatioValue = (ratio?: string) => {
     if (!ratio) return undefined
     const map: Record<string, string> = {
-      '1:1': '1 / 1',
-      '2:3': '2 / 3',
-      '3:2': '3 / 2',
       '16:9': '16 / 9',
       '2:1': '2 / 1',
       '3:1': '3 / 1',
@@ -195,6 +194,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     tldrTitle !== savedTldrTitle ||
     tldrSubtitle !== savedTldrSubtitle ||
     tldrBannerPreview !== savedBannerUrl ||
+    tldrBannerAspectRatio !== savedBannerAspectRatio ||
     tldrLogoPreview !== savedLogoUrl ||
     JSON.stringify(tldrSocials) !== JSON.stringify(savedSocials) ||
     JSON.stringify(tldrContentLinks) !== JSON.stringify(savedContentLinks)
@@ -251,6 +251,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
       tldr_title: tldrTitle,
       tldr_subtitle: tldrSubtitle,
       tldr_banner_url: bannerUrl,
+      tldr_banner_aspect_ratio: tldrBannerAspectRatio || null,
       tldr_logo_url: logoUrl,
       tldr_socials: tldrSocials,
       tldr_content_links: updatedContentLinks,
@@ -277,7 +278,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                 <input ref={bannerInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBannerUpload} />
                 {tldrBannerPreview && (
                   <div className="stylefield-block" style={{ justifyContent: 'flex-start' }}>
-                    <div className="thumbnailpreview">
+                    <div className="thumbnailpreview" style={{ aspectRatio: aspectRatioValue(tldrBannerAspectRatio) }}>
                       <img src={tldrBannerPreview} alt="" className="fullimage" />
                     </div>
                     <div>
@@ -289,11 +290,30 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                   </div>
                 )}
                 {!tldrBannerPreview && (
-                  <div className="uploadcard" style={{ cursor: 'pointer' }} onClick={() => bannerInputRef.current?.click()}>
+                  <div className="uploadcard" style={{ cursor: 'pointer', aspectRatio: aspectRatioValue(tldrBannerAspectRatio) }} onClick={() => bannerInputRef.current?.click()}>
                     {uploadIconSvg}
                     <div>Upload Image</div>
                   </div>
                 )}
+                <div className="alignrow aligncenter wrap">
+                  <div className="labeltext">Aspect Ratio</div>
+                  {['16:9', '2:1', '3:1', '4:1'].map((ratio) => {
+                    const isSelected = tldrBannerAspectRatio === ratio
+                    return (
+                      <a
+                        key={ratio}
+                        href="#"
+                        className={`calloutpill w-inline-block${isSelected ? ' selected' : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setTldrBannerAspectRatio(isSelected ? '' : ratio)
+                        }}
+                      >
+                        <div>{ratio}</div>
+                      </a>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Logo Image */}
@@ -521,7 +541,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                             )}
                             <div className="alignrow aligncenter wrap">
                               <div className="labeltext">Aspect Ratio</div>
-                              {['1:1', '2:3', '3:2', '16:9', '2:1', '3:1', '4:1'].map((ratio) => {
+                              {['16:9', '2:1', '3:1', '4:1'].map((ratio) => {
                                 const isSelected = cl.aspectRatio === ratio
                                 return (
                                   <a
@@ -691,7 +711,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                             )}
                             <div className="alignrow aligncenter wrap">
                               <div className="labeltext">Aspect Ratio:</div>
-                              {['1:1', '2:3', '3:2', '16:9', '2:1', '3:1', '4:1'].map((ratio) => {
+                              {['16:9', '2:1', '3:1', '4:1'].map((ratio) => {
                                 const isSelected = cl.aspectRatio === ratio
                                 return (
                                   <a
@@ -848,7 +868,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     <div className="widget-content tldr">
       {/* Hero Banner */}
       {tldrBannerPreview ? (
-        <div className="tabhero">
+        <div className="tabhero" style={tldrBannerAspectRatio ? { aspectRatio: aspectRatioValue(tldrBannerAspectRatio), height: 'auto' } : undefined}>
           <img src={tldrBannerPreview} alt="" className="full-image" loading="lazy" />
         </div>
       ) : (

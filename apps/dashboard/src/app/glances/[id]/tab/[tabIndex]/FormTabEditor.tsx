@@ -29,6 +29,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const savedTldrTitle = (tab as any).tldr_title ?? ''
   const savedTldrSubtitle = (tab as any).tldr_subtitle ?? ''
   const savedBannerUrl = (tab as any).tldr_banner_url ?? null
+  const savedBannerAspectRatio = (tab as any).tldr_banner_aspect_ratio ?? ''
 
   // State
   const [formFields, setFormFields] = useState<{ label: string; type: string }[]>(
@@ -39,6 +40,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const [tldrTitle, setTldrTitle] = useState(savedTldrTitle)
   const [tldrSubtitle, setTldrSubtitle] = useState(savedTldrSubtitle)
   const [tldrBannerPreview, setTldrBannerPreview] = useState<string | null>(savedBannerUrl)
+  const [tldrBannerAspectRatio, setTldrBannerAspectRatio] = useState(savedBannerAspectRatio)
   const [openFieldDropdown, setOpenFieldDropdown] = useState<number | null>(null)
   const [hoveredSection, setHoveredSection] = useState<string | null>(null)
 
@@ -113,6 +115,17 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     const d = new Date(dateStr)
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' \u2022 ' +
       d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+
+  const aspectRatioValue = (ratio?: string) => {
+    if (!ratio) return undefined
+    const map: Record<string, string> = {
+      '16:9': '16 / 9',
+      '2:1': '2 / 1',
+      '3:1': '3 / 1',
+      '4:1': '4 / 1',
+    }
+    return map[ratio] || undefined
   }
 
   const getRowName = (sub: any): React.ReactNode => {
@@ -269,7 +282,8 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
     formSuccessMessage !== savedFormSuccessMessage ||
     tldrTitle !== savedTldrTitle ||
     tldrSubtitle !== savedTldrSubtitle ||
-    tldrBannerPreview !== savedBannerUrl
+    tldrBannerPreview !== savedBannerUrl ||
+    tldrBannerAspectRatio !== savedBannerAspectRatio
 
   // Save — uploads banner if needed, then passes payload to orchestrator
   const handleSave = async () => {
@@ -290,6 +304,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
       tldr_title: tldrTitle,
       tldr_subtitle: tldrSubtitle,
       tldr_banner_url: bannerUrl,
+      tldr_banner_aspect_ratio: tldrBannerAspectRatio || null,
       form_fields: formFields,
       form_webhook_url: formWebhookUrl,
       form_success_message: formSuccessMessage,
@@ -318,7 +333,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                     <input ref={formBannerInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFormBannerUpload} />
                     {tldrBannerPreview && (
                       <div className="stylefield-block" style={{ justifyContent: 'flex-start' }}>
-                        <div className="thumbnailpreview">
+                        <div className="thumbnailpreview" style={{ aspectRatio: aspectRatioValue(tldrBannerAspectRatio) }}>
                           <img src={tldrBannerPreview} alt="" className="fullimage" />
                         </div>
                         <div>
@@ -330,11 +345,30 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                       </div>
                     )}
                     {!tldrBannerPreview && (
-                      <div className="uploadcard" style={{ cursor: 'pointer' }} onClick={() => formBannerInputRef.current?.click()}>
+                      <div className="uploadcard" style={{ cursor: 'pointer', aspectRatio: aspectRatioValue(tldrBannerAspectRatio) }} onClick={() => formBannerInputRef.current?.click()}>
                         {uploadIconSvg}
                         <div>Upload Image</div>
                       </div>
                     )}
+                    <div className="alignrow aligncenter wrap">
+                      <div className="labeltext">Aspect Ratio</div>
+                      {['16:9', '2:1', '3:1', '4:1'].map((ratio) => {
+                        const isSelected = tldrBannerAspectRatio === ratio
+                        return (
+                          <a
+                            key={ratio}
+                            href="#"
+                            className={`calloutpill w-inline-block${isSelected ? ' selected' : ''}`}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              setTldrBannerAspectRatio(isSelected ? '' : ratio)
+                            }}
+                          >
+                            <div>{ratio}</div>
+                          </a>
+                        )
+                      })}
+                    </div>
                   </div>
 
                   {/* Title */}
@@ -697,7 +731,7 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const preview = (
     <div className="widget-content forms" style={{ display: 'flex' }}>
       {tldrBannerPreview && (
-        <div className="tabhero no-pull">
+        <div className="tabhero no-pull" style={tldrBannerAspectRatio ? { aspectRatio: aspectRatioValue(tldrBannerAspectRatio), height: 'auto' } : undefined}>
           <img src={tldrBannerPreview} alt="" className="full-image" loading="lazy" />
         </div>
       )}
