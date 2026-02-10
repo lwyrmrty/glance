@@ -1298,7 +1298,8 @@ function G(l,e,s,p,c,widgetEl){
       if(msg.data&&msg.data.glance_auth_token){
         window.removeEventListener("message",handler);
         localStorage.setItem("glance_session_"+p,msg.data.glance_auth_token);
-        if(widgetEl)widgetEl.renderActiveTab()
+        if(msg.data.glance_auth_user&&msg.data.glance_auth_user.id){_glanceUserId=msg.data.glance_auth_user.id;_glanceUser=msg.data.glance_auth_user}
+        if(widgetEl){delete widgetEl._tabCache?.[widgetEl.activeTabIndex];requestAnimationFrame(()=>widgetEl.renderActiveTab())}
       }
     })
   });
@@ -1397,7 +1398,7 @@ function G(l,e,s,p,c,widgetEl){
       let data=await res.json();
       if(!res.ok){mcErr.textContent=data.error||"Verification failed";mcErr.style.display="block";mcBtn.disabled=!1;mcBtn.value="Login";return}
       localStorage.setItem("glance_session_"+p,data.token);if(data.user&&data.user.id){_glanceUserId=data.user.id;_glanceUser=data.user}
-      if(widgetEl)widgetEl.renderActiveTab()
+      if(widgetEl){delete widgetEl._tabCache?.[widgetEl.activeTabIndex];requestAnimationFrame(()=>widgetEl.renderActiveTab())}
     }catch(err){mcErr.textContent="Something went wrong. Please try again.";mcErr.style.display="block";mcBtn.disabled=!1;mcBtn.value="Login"}
   });
   mc.appendChild(mcBtn);fw.appendChild(mc);
@@ -1431,7 +1432,7 @@ function G(l,e,s,p,c,widgetEl){
       let data=await res.json();
       if(!res.ok){mlErr.textContent=data.error||"Verification failed";mlErr.style.display="block";mlBtn.disabled=!1;mlBtn.value="Login";return}
       localStorage.setItem("glance_session_"+p,data.token);if(data.user&&data.user.id){_glanceUserId=data.user.id;_glanceUser=data.user}
-      if(widgetEl)widgetEl.renderActiveTab()
+      if(widgetEl){delete widgetEl._tabCache?.[widgetEl.activeTabIndex];requestAnimationFrame(()=>widgetEl.renderActiveTab())}
     }catch(err){mlErr.textContent="Something went wrong. Please try again.";mlErr.style.display="block";mlBtn.disabled=!1;mlBtn.value="Login"}
   });
   ml.appendChild(mlBtn);fw.appendChild(ml);
