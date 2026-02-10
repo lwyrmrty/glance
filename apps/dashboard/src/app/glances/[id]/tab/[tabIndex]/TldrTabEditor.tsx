@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { dragIconSvg, uploadIconSvg, socialPlatforms, type TabHookProps, type TabHookResult } from './shared/icons'
 
@@ -20,6 +20,14 @@ type ContentLink = {
   imageLink?: string
   aspectRatio?: string
   videoUrl?: string
+}
+
+const contentTypeIcons: Record<ContentType, React.ReactNode> = {
+  row: <img src="/images/row.svg" alt="" width={18} height={18} />,
+  stack: <img src="/images/stack.svg" alt="" width={18} height={18} />,
+  quote: <img src="/images/quote.svg" alt="" width={18} height={18} />,
+  photo: <img src="/images/gallerydark.svg" alt="" width={18} height={18} />,
+  video: <img src="/images/video.svg" alt="" width={18} height={18} />,
 }
 
 const normalizeContentLinks = (links: ContentLink[]) =>
@@ -66,11 +74,24 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const [tldrContentLinks, setTldrContentLinks] = useState<ContentLink[]>(savedContentLinks)
   const [contentDragIndex, setContentDragIndex] = useState<number | null>(null)
   const [contentDragOverIndex, setContentDragOverIndex] = useState<number | null>(null)
+  const [openContentTypeDropdown, setOpenContentTypeDropdown] = useState<number | null>(null)
 
   // Refs
   const bannerInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const contentImageRefs = useRef<(HTMLInputElement | null)[]>([])
+  const contentTypeDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (openContentTypeDropdown === null) return
+    const handler = (e: MouseEvent) => {
+      if (contentTypeDropdownRef.current && !contentTypeDropdownRef.current.contains(e.target as Node)) {
+        setOpenContentTypeDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openContentTypeDropdown])
 
   // File refs for actual upload on save
   const bannerFileRef = useRef<File | null>(null)
@@ -87,6 +108,8 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
       '3:2': '3 / 2',
       '16:9': '16 / 9',
       '2:1': '2 / 1',
+      '3:1': '3 / 1',
+      '4:1': '4 / 1',
     }
     return map[ratio] || undefined
   }
@@ -403,21 +426,53 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                       <div className="alignrow aligncenter stretch">
                         <div className="draggingblock moved">{dragIconSvg}</div>
                         <div className="prompt-block">
-                          <div className="alignrow aligncenter wrap">
-                            <div className="labeltext">Content Type</div>
-                            {(['row', 'stack', 'quote', 'photo', 'video'] as ContentType[]).map((type) => (
-                              <a
-                                key={type}
-                                href="#"
-                                className={`calloutpill w-inline-block${activeType === type ? ' selected' : ''}`}
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  updateContentType(i, type)
-                                }}
-                              >
-                                <div>{type.charAt(0).toUpperCase() + type.slice(1)}</div>
-                              </a>
-                            ))}
+                          <div className="filterswrapper filterswrapper-full" ref={openContentTypeDropdown === i ? contentTypeDropdownRef : undefined}>
+                            <a
+                              href="#"
+                              className={`dropdownbuttons dropdownbuttons-full ${activeType ? '' : 'empty'} w-inline-block`}
+                              onClick={(e) => { e.preventDefault(); setOpenContentTypeDropdown(openContentTypeDropdown === i ? null : i) }}
+                            >
+                              <div className="alignrow aligncenter">
+                                <div className="navbarlink-icon sm">
+                                  {contentTypeIcons[activeType]}
+                                </div>
+                                <div>{activeType.charAt(0).toUpperCase() + activeType.slice(1)}</div>
+                              </div>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" className="dropdowntoggle" style={{ transform: openContentTypeDropdown === i ? 'rotate(90deg)' : undefined, transition: 'transform 0.2s' }}>
+                                <path d="M10 8L14 12L10 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </a>
+                            {openContentTypeDropdown === i && (
+                              <div className="widgetsmodal" style={{ display: 'flex', position: 'absolute', inset: 'auto', right: 0, top: '100%', zIndex: 50, minWidth: 200, height: 'auto' }}>
+                                <div className="widgetsmodal-block">
+                                  <div className="labelrow">
+                                    <div className="labeltext">Content Type</div>
+                                    <div className="labeldivider" />
+                                  </div>
+                                  <div className="pillswrapper">
+                                    {(['row', 'stack', 'quote', 'photo', 'video'] as ContentType[]).map((type) => (
+                                      <a
+                                        key={type}
+                                        href="#"
+                                        className={`widgetpill w-inline-block${activeType === type ? ' active' : ''}`}
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          updateContentType(i, type)
+                                          setOpenContentTypeDropdown(null)
+                                        }}
+                                      >
+                                        <div className="alignrow aligncenter">
+                                          <div className="navbarlink-icon sm">
+                                            {contentTypeIcons[type]}
+                                          </div>
+                                          <div>{type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                                        </div>
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           <div content-type="video" className="contenttype-block" style={{ display: activeType === 'video' ? 'flex' : 'none' }}>
@@ -465,8 +520,8 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                               </div>
                             )}
                             <div className="alignrow aligncenter wrap">
-                              <div className="labeltext">Aspect Ration</div>
-                              {['1:1', '2:3', '3:2', '16:9', '2:1'].map((ratio) => {
+                              <div className="labeltext">Aspect Ratio</div>
+                              {['1:1', '2:3', '3:2', '16:9', '2:1', '3:1', '4:1'].map((ratio) => {
                                 const isSelected = cl.aspectRatio === ratio
                                 return (
                                   <a
@@ -636,7 +691,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                             )}
                             <div className="alignrow aligncenter wrap">
                               <div className="labeltext">Aspect Ratio:</div>
-                              {['1:1', '2:3', '3:2', '16:9', '2:1'].map((ratio) => {
+                              {['1:1', '2:3', '3:2', '16:9', '2:1', '3:1', '4:1'].map((ratio) => {
                                 const isSelected = cl.aspectRatio === ratio
                                 return (
                                   <a
@@ -909,9 +964,11 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                     ) : (
                       <div className="full-image" style={{ background: '#e8e8e8' }} />
                     )}
-                    <div className="imageoverlay">
-                      <div>{cl.imageLabel || 'Image label text'}</div>
-                    </div>
+                    {cl.imageLabel?.trim() && (
+                      <div className="imageoverlay">
+                        <div>{cl.imageLabel}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )

@@ -2192,6 +2192,11 @@ em {
   position: relative;
 }
 
+.filterswrapper-full {
+  flex: 1;
+  min-width: 0;
+}
+
 .filtersdropdown {
   z-index: 99;
   border: 1.5px solid var(--admin-border);
@@ -3320,6 +3325,10 @@ em {
 
 .dropdownbuttons.empty {
   padding-left: 12px;
+}
+
+.dropdownbuttons-full {
+  width: 100%;
 }
 
 .go-arrow {
