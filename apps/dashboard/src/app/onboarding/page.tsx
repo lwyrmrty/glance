@@ -15,8 +15,17 @@ export default function OnboardingPage() {
   const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo must be under 5MB')
+      return
+    }
     setIconFile(file)
     setIconPreview(URL.createObjectURL(file))
+    setError(null)
   }
 
   const handleDeleteIcon = (e: React.MouseEvent) => {
@@ -34,10 +43,15 @@ export default function OnboardingPage() {
     setError(null)
 
     try {
+      const formData = new FormData()
+      formData.append('name', name.trim())
+      if (iconFile) {
+        formData.append('logo', iconFile)
+      }
+
       const res = await fetch('/api/workspaces', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
+        body: formData,
       })
 
       if (!res.ok) {
@@ -49,8 +63,6 @@ export default function OnboardingPage() {
 
       const data = await res.json()
       const workspaceId = data.workspace?.id
-
-      // TODO: Upload icon to workspace if iconFile exists
 
       router.push(`/w/${workspaceId}/glances`)
     } catch {

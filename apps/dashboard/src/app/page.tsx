@@ -15,7 +15,7 @@ export default async function Home() {
   // Fetch all workspace memberships with workspace details
   const { data: memberships } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, workspaces(id, name, created_at)')
+    .select('workspace_id, role, workspaces(id, name, logo_url, created_at)')
     .eq('user_id', userId)
     .order('accepted_at', { ascending: true })
 
@@ -79,6 +79,7 @@ export default async function Home() {
   const workspaces = workspaceList.map((m: any) => ({
     id: m.workspace_id,
     name: (m.workspaces as any)?.name ?? 'Workspace',
+    logo_url: (m.workspaces as any)?.logo_url ?? null,
     role: m.role,
     glance_count: (widgetsByWorkspace[m.workspace_id] || []).length,
     glances: (widgetsByWorkspace[m.workspace_id] || []).map((w: any) => ({

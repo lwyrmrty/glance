@@ -76,10 +76,10 @@ export async function validateWorkspaceAccess(
   supabase: any,
   userId: string,
   workspaceId: string
-): Promise<{ workspace_id: string; workspace_name: string; role: string } | null> {
+): Promise<{ workspace_id: string; workspace_name: string; workspace_logo_url?: string | null; role: string } | null> {
   const { data: membership } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, workspaces(name)')
+    .select('workspace_id, role, workspaces(name, logo_url)')
     .eq('user_id', userId)
     .eq('workspace_id', workspaceId)
     .single()
@@ -89,6 +89,7 @@ export async function validateWorkspaceAccess(
   return {
     workspace_id: workspaceId,
     workspace_name: (membership.workspaces as any)?.name ?? 'Workspace',
+    workspace_logo_url: (membership.workspaces as any)?.logo_url ?? null,
     role: membership.role,
   }
 }
