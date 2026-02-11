@@ -206,6 +206,14 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const removeContentLink = (index: number) => {
     setTldrContentLinks(prev => prev.filter((_, i) => i !== index))
   }
+  const duplicateContentLink = (index: number) => {
+    setTldrContentLinks(prev => {
+      const copy = { ...prev[index] }
+      const next = [...prev]
+      next.splice(index + 1, 0, copy)
+      return next
+    })
+  }
   const handleContentDragStart = (index: number) => {
     setContentDragIndex(index)
   }
@@ -932,7 +940,18 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
                           </div>
                         </div>
                       </div>
-                      <div className="rowcard-actions" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+                      <div className="rowcard-actions" style={{ justifyContent: 'flex-end', marginTop: 12, gap: 8 }}>
+                        <div
+                          className="rowcard-action"
+                          title="Duplicate content link"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => duplicateContentLink(i)}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                          </svg>
+                        </div>
                         <div
                           className="rowcard-action delete"
                           title="Delete content link"
