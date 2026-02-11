@@ -109,16 +109,19 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
 
   const [tabDragIndex, setTabDragIndex] = useState<number | null>(null)
   const [tabDragOverIndex, setTabDragOverIndex] = useState<number | null>(null)
+  const [tabDragOverDelete, setTabDragOverDelete] = useState(false)
 
   const handleTabDragStart = (index: number) => setTabDragIndex(index)
   const handleTabDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault()
+    setTabDragOverDelete(false)
     setTabDragOverIndex(index)
   }
   const handleTabDrop = (index: number) => {
     if (tabDragIndex === null || tabDragIndex === index) {
       setTabDragIndex(null)
       setTabDragOverIndex(null)
+      setTabDragOverDelete(false)
       return
     }
     setTabs(prev => {
@@ -136,10 +139,38 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
     })
     setTabDragIndex(null)
     setTabDragOverIndex(null)
+    setTabDragOverDelete(false)
   }
   const handleTabDragEnd = () => {
     setTabDragIndex(null)
     setTabDragOverIndex(null)
+    setTabDragOverDelete(false)
+  }
+  const handleDeleteZoneDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setTabDragOverIndex(null)
+    setTabDragOverDelete(true)
+  }
+  const handleDeleteZoneDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (tabDragIndex !== null) {
+      setTabs(prev => {
+        const updated = [...prev]
+        const [moved] = updated.splice(tabDragIndex, 1)
+        const cleared = { ...moved, name: '', icon: '/images/Chats.svg', type: '' }
+        updated.push(cleared)
+        return updated
+      })
+      setTabIconFiles(prev => {
+        const updated = [...prev]
+        updated.splice(tabDragIndex, 1)
+        updated.push(null)
+        return updated
+      })
+    }
+    setTabDragIndex(null)
+    setTabDragOverIndex(null)
+    setTabDragOverDelete(false)
   }
 
   // Widget type picker modal
@@ -506,6 +537,7 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
                                 borderTop: tabDragOverIndex === index && tabDragIndex !== null && tabDragIndex > index ? '2px solid var(--vcs-purple)' : undefined,
                                 borderBottom: tabDragOverIndex === index && tabDragIndex !== null && tabDragIndex < index ? '2px solid var(--vcs-purple)' : undefined,
                                 transition: 'opacity 0.15s',
+                                justifyContent: 'center',
                               }}
                             >
                               <div className="draggingblock" style={{ cursor: 'grab' }}>
@@ -515,7 +547,7 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
                                   </g>
                                 </svg>
                               </div>
-                              <label className="iconpicker" style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden' }}>
+                              <label className="iconpicker" style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden', marginBottom: 0 }}>
                                 <img loading="lazy" src={tab.icon} alt="" className="navicon med" />
                                 <input 
                                   type="file" 
@@ -623,6 +655,36 @@ export default function GlanceEditor({ glanceId, workspaceId, workspaceName, gla
                               </div>
                             </div>
                           ))}
+                          {tabDragIndex !== null && (
+                            <div
+                              className="rowcard-delete-zone"
+                              onDragOver={handleDeleteZoneDragOver}
+                              onDragLeave={() => setTabDragOverDelete(false)}
+                              onDrop={handleDeleteZoneDrop}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                minHeight: 66,
+                                marginTop: 8,
+                                padding: '8px 12px',
+                                border: `2px dashed ${tabDragOverDelete ? 'var(--vcs-purple)' : 'var(--admin-border)'}`,
+                                borderRadius: 10,
+                                background: tabDragOverDelete ? 'rgba(124, 58, 237, 0.06)' : 'transparent',
+                                color: tabDragOverDelete ? 'var(--vcs-purple)' : '#999',
+                                fontSize: 14,
+                                transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+                              }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                <line x1="10" y1="11" x2="10" y2="17" />
+                                <line x1="14" y1="11" x2="14" y2="17" />
+                              </svg>
+                              <span>Drop here to clear tab</span>
+                            </div>
+                          )}
                         </div>
                       </div>}
                     </div>
