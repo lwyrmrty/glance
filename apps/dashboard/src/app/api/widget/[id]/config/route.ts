@@ -43,6 +43,10 @@ export async function GET(
   const buttonStyle = (widget.button_style as Record<string, unknown>) ?? {}
   const workspace = widget.workspaces as any
 
+  // Filter tabs: only include those with both name and widget type (omit from live nav otherwise)
+  const allTabs = (buttonStyle.tabs as { name?: string; icon?: string; type?: string }[]) ?? []
+  const tabs = allTabs.filter(t => (t.name?.trim() ?? '') !== '' && (t.type?.trim() ?? '') !== '')
+
   // Build the config object the widget expects
   const config = {
     id: widget.id,
@@ -50,7 +54,7 @@ export async function GET(
     name: widget.name,
     logo_url: widget.logo_url,
     theme_color: widget.theme_color,
-    tabs: (buttonStyle.tabs as unknown[]) ?? [],
+    tabs,
     prompts: (buttonStyle.prompts as unknown[]) ?? [],
     callout_text: (buttonStyle.callout_text as string) ?? '',
     callout_url: (buttonStyle.callout_url as string) ?? '',

@@ -135,6 +135,9 @@ export function AccountCreationPage({ workspaceName, workspaceId, glances }: Acc
                   <a href={`${prefix}/form-submissions`} className="innerhero-nav-link w-inline-block">
                     <div>Form Submissions</div>
                   </a>
+                  <a href={`${prefix}/chats`} className="innerhero-nav-link w-inline-block">
+                    <div>Chats</div>
+                  </a>
                   <a href={`${prefix}/account-creation`} className="innerhero-nav-link active w-inline-block">
                     <div>Account Creation</div>
                   </a>

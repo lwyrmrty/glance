@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { validateWorkspaceAccess } from '@/lib/workspace'
-import { SettingsPage } from '@/app/settings/SettingsPage'
+import { ChatsPage } from '@/app/chats/ChatsPage'
 
-export default async function SettingsRoute({ params }: { params: Promise<{ workspaceId: string }> }) {
+export default async function ChatsRoute({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
@@ -25,10 +25,8 @@ export default async function SettingsRoute({ params }: { params: Promise<{ work
     .limit(3)
 
   return (
-    <SettingsPage
+    <ChatsPage
       workspaceName={workspace.workspace_name}
-      workspaceLogoUrl={workspace.workspace_logo_url}
-      workspaceThemeColor={workspace.workspace_theme_color}
       workspaceId={workspaceId}
       glances={glances ?? []}
     />

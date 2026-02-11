@@ -76,20 +76,41 @@ export async function validateWorkspaceAccess(
   supabase: any,
   userId: string,
   workspaceId: string
-): Promise<{ workspace_id: string; workspace_name: string; workspace_logo_url?: string | null; role: string } | null> {
-  const { data: membership } = await supabase
+): Promise<{ workspace_id: string; workspace_name: string; workspace_logo_url?: string | null; workspace_theme_color?: string | null; role: string } | null> {
+  // Select without theme_color first — column may not exist if migration hasn't run
+  const { data: membership, error } = await supabase
     .from('workspace_members')
-    .select('workspace_id, role, workspaces(name, logo_url)')
+    .select('workspace_id, role, workspaces(name, logo_url, theme_color)')
     .eq('user_id', userId)
     .eq('workspace_id', workspaceId)
     .single()
 
+  if (error) {
+    const { data: fallback } = await supabase
+      .from('workspace_members')
+      .select('workspace_id, role, workspaces(name, logo_url)')
+      .eq('user_id', userId)
+      .eq('workspace_id', workspaceId)
+      .single()
+    if (!fallback) return null
+    const wr = fallback.workspaces as any
+    return {
+      workspace_id: workspaceId,
+      workspace_name: wr?.name ?? 'Workspace',
+      workspace_logo_url: wr?.logo_url ?? null,
+      workspace_theme_color: null,
+      role: fallback.role,
+    }
+  }
+
   if (!membership) return null
 
+  const workspacesRow = membership.workspaces as any
   return {
     workspace_id: workspaceId,
-    workspace_name: (membership.workspaces as any)?.name ?? 'Workspace',
-    workspace_logo_url: (membership.workspaces as any)?.logo_url ?? null,
+    workspace_name: workspacesRow?.name ?? 'Workspace',
+    workspace_logo_url: workspacesRow?.logo_url ?? null,
+    workspace_theme_color: workspacesRow?.theme_color ?? null,
     role: membership.role,
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { useToast } from '@/components/Toast'
@@ -8,13 +8,27 @@ import { useToast } from '@/components/Toast'
 interface SettingsPageProps {
   workspaceName?: string
   workspaceLogoUrl?: string | null
+  workspaceThemeColor?: string | null
   workspaceId?: string
   glances?: Array<{ id: string; name: string; logo_url?: string | null }>
+}
+
+const DEFAULT_THEME_COLOR = '#7C3AED'
+
+function normalizeHex(hex: string): string | null {
+  const m = hex.match(/^#?([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/)
+  if (!m) return null
+  const digits = m[1]
+  if (digits.length === 3) {
+    return '#' + digits.split('').map((c) => c + c).join('')
+  }
+  return '#' + digits
 }
 
 export function SettingsPage({
   workspaceName = '',
   workspaceLogoUrl = null,
+  workspaceThemeColor = null,
   workspaceId,
   glances = [],
 }: SettingsPageProps) {
@@ -22,7 +36,11 @@ export function SettingsPage({
   const { showToast } = useToast()
   const [name, setName] = useState(workspaceName)
   const [logoPreview, setLogoPreview] = useState<string | null>(workspaceLogoUrl)
+  const [themeColor, setThemeColor] = useState(workspaceThemeColor || DEFAULT_THEME_COLOR)
   const [logoFile, setLogoFile] = useState<File | null>(null)
+  useEffect(() => {
+    setThemeColor(workspaceThemeColor || DEFAULT_THEME_COLOR)
+  }, [workspaceThemeColor])
   const [logoRemoved, setLogoRemoved] = useState(false)
   const [saving, setSaving] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -53,15 +71,27 @@ export function SettingsPage({
   const handleSave = async () => {
     if (!workspaceId) return
 
+    const initialTheme = workspaceThemeColor || DEFAULT_THEME_COLOR
     const hasNameChange = name.trim() !== workspaceName
     const hasLogoChange = logoFile !== null || logoRemoved
-    if (!hasNameChange && !hasLogoChange) return
+    let themeToSave: string | null = null
+    if (themeColor !== initialTheme) {
+      const normalized = normalizeHex(themeColor)
+      if (!normalized) {
+        showToast('Please enter a valid hex color (e.g. #7C3AED)', 'error')
+        return
+      }
+      themeToSave = normalized
+    }
+    const hasThemeChange = themeToSave !== null
+    if (!hasNameChange && !hasLogoChange && !hasThemeChange) return
 
     setSaving(true)
     try {
       const formData = new FormData()
       formData.append('id', workspaceId)
       if (hasNameChange) formData.append('name', name.trim())
+      if (themeToSave) formData.append('theme_color', themeToSave)
       if (logoFile) formData.append('logo', logoFile)
       if (logoRemoved) formData.append('clear_logo', 'true')
 
@@ -77,6 +107,7 @@ export function SettingsPage({
         setLogoFile(null)
         setLogoRemoved(false)
         setLogoPreview(data.workspace?.logo_url ?? null)
+        if (data.workspace?.theme_color) setThemeColor(data.workspace.theme_color)
         router.refresh()
       } else {
         showToast(data?.error ?? 'Failed to save', 'error')
@@ -88,8 +119,9 @@ export function SettingsPage({
     }
   }
 
+  const initialTheme = workspaceThemeColor || DEFAULT_THEME_COLOR
   const hasChanges =
-    name.trim() !== workspaceName || logoFile !== null || logoRemoved
+    name.trim() !== workspaceName || logoFile !== null || logoRemoved || themeColor !== initialTheme
 
   return (
     <div className="pagewrapper">
@@ -211,6 +243,40 @@ export function SettingsPage({
                             <div>Upload Image</div>
                           </div>
                         )}
+                      </div>
+                      <div className="fieldblocks">
+                        <div className="labelrow">
+                          <div className="labeltext">Theme Color</div>
+                          <div className="labeldivider"></div>
+                        </div>
+                        <div className="alignrow alignbottom" style={{ gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="color"
+                            value={themeColor}
+                            onChange={(e) => setThemeColor(e.target.value)}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              padding: '2px',
+                              border: '1px solid var(--border-color, #e5e7eb)',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                            }}
+                            title="Workspace theme color"
+                          />
+                          <input
+                            className="formfields w-input"
+                            type="text"
+                            value={themeColor}
+                            onChange={(e) => setThemeColor(e.target.value)}
+                            placeholder="#7C3AED"
+                            maxLength={7}
+                            style={{ width: '120px' }}
+                          />
+                        </div>
+                        <div className="pagesubheading" style={{ marginTop: '6px', fontSize: '13px' }}>
+                          Accent color for workspace pages (links, buttons, etc.). Does not affect Glances.
+                        </div>
                       </div>
                       <div className="alignrow alignbottom" style={{ gap: '12px', marginTop: '20px' }}>
                         <button

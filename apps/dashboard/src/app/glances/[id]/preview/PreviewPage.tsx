@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Script from 'next/script'
 import { useRef, useEffect, useState } from 'react'
 
 interface Glance {
@@ -27,10 +26,13 @@ export function PreviewPage({ glance, workspaceId }: PreviewPageProps) {
   const prefix = workspaceId ? `/w/${workspaceId}` : ''
   const containerRef = useRef<HTMLDivElement>(null)
   const [scriptLoaded, setScriptLoaded] = useState(false)
-  const widgetRef = useRef<HTMLElement | null>(null)
 
   const buttonStyle = (glance.button_style ?? {}) as Record<string, unknown>
   const workspace = (glance as any).workspaces as Record<string, unknown> | null
+
+  // Filter tabs: only include those with both name and widget type (omit from live nav otherwise)
+  const allTabs = (buttonStyle.tabs as { name?: string; icon?: string; type?: string }[]) ?? []
+  const tabs = allTabs.filter(t => (t.name?.trim() ?? '') !== '' && (t.type?.trim() ?? '') !== '')
 
   // Build the widget config in the same shape the embeddable widget expects
   const widgetConfig = {
@@ -39,7 +41,7 @@ export function PreviewPage({ glance, workspaceId }: PreviewPageProps) {
     name: glance.name,
     logo_url: glance.logo_url,
     theme_color: glance.theme_color,
-    tabs: (buttonStyle.tabs as unknown[]) ?? [],
+    tabs,
     prompts: (buttonStyle.prompts as unknown[]) ?? [],
     callout_text: (buttonStyle.callout_text as string) ?? '',
     callout_url: (buttonStyle.callout_url as string) ?? '',
@@ -52,21 +54,29 @@ export function PreviewPage({ glance, workspaceId }: PreviewPageProps) {
     },
   }
 
+  // Load widget.js once on mount via plain script tag
+  useEffect(() => {
+    if (typeof customElements !== 'undefined' && customElements.get('glance-widget')) {
+      setScriptLoaded(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = '/widget.js'
+    script.async = true
+    script.onload = () => setScriptLoaded(true)
+    document.body.appendChild(script)
+    return () => { script.remove() }
+  }, [])
+
   useEffect(() => {
     if (!scriptLoaded || !containerRef.current) return
 
-    // Create the actual <glance-widget> custom element
     const widget = document.createElement('glance-widget') as any
     widget.setAttribute('data-widget-id', glance.id)
     widget.widgetConfig = widgetConfig
     widget.apiBase = window.location.origin
     containerRef.current.appendChild(widget)
-    widgetRef.current = widget
-
-    return () => {
-      widget.remove()
-      widgetRef.current = null
-    }
+    return () => { widget.remove() }
   }, [scriptLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -100,14 +110,6 @@ export function PreviewPage({ glance, workspaceId }: PreviewPageProps) {
 
       {/* The widget custom element mounts here */}
       <div ref={containerRef} />
-
-      {/* Load widget.js — it registers the <glance-widget> custom element.
-          Without data-widget-id on the script tag, the auto-init IIFE exits silently. */}
-      <Script
-        src="/widget.js"
-        strategy="afterInteractive"
-        onLoad={() => setScriptLoaded(true)}
-      />
     </div>
   )
 }

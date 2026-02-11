@@ -62,7 +62,7 @@ export default function Sidebar({ workspaceName, workspaceId, glances }: Sidebar
               href={`${prefix}/accounts`}
               label="User Data"
               icon="/images/users.svg"
-              isActive={isActive(`${prefix}/accounts`)}
+              isActive={isActive(`${prefix}/accounts`) || isActive(`${prefix}/form-submissions`) || isActive(`${prefix}/chats`) || isActive(`${prefix}/account-creation`)}
             />
             <NavItem
               href={`${prefix}/analytics`}

@@ -214,6 +214,9 @@ export function AccountsPage({ workspaceName, workspaceId, glances }: AccountsPa
                   <a href={`${prefix}/form-submissions`} className="innerhero-nav-link w-inline-block">
                     <div>Form Submissions</div>
                   </a>
+                  <a href={`${prefix}/chats`} className="innerhero-nav-link w-inline-block">
+                    <div>Chats</div>
+                  </a>
                   <a href={`${prefix}/account-creation`} className="innerhero-nav-link w-inline-block">
                     <div>Account Creation</div>
                   </a>

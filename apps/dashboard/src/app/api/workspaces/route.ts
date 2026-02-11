@@ -190,6 +190,7 @@ export async function PATCH(request: NextRequest) {
     let name: string | null = null
     let logoFile: File | null = null
     let clearLogo = false
+    let themeColor: string | null = null
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData()
@@ -198,6 +199,10 @@ export async function PATCH(request: NextRequest) {
       const nameVal = formData.get('name')
       if (nameVal && typeof nameVal === 'string' && nameVal.trim()) {
         name = nameVal.trim()
+      }
+      const themeVal = formData.get('theme_color')
+      if (themeVal && typeof themeVal === 'string' && themeVal.trim()) {
+        themeColor = themeVal.trim()
       }
       const file = formData.get('logo') as File | null
       if (file && file.size > 0 && file.type.startsWith('image/')) {
@@ -211,14 +216,21 @@ export async function PATCH(request: NextRequest) {
       const body = await request.json()
       id = body?.id ?? ''
       name = body?.name ?? null
+      if (body?.theme_color && typeof body.theme_color === 'string' && body.theme_color.trim()) {
+        themeColor = body.theme_color.trim()
+      }
     }
 
     if (!id) {
       return NextResponse.json({ error: 'Missing workspace id' }, { status: 400 })
     }
 
-    if (!name && !logoFile && !clearLogo) {
-      return NextResponse.json({ error: 'Provide name, logo, or clear_logo to update' }, { status: 400 })
+    if (!name && !logoFile && !clearLogo && themeColor === null) {
+      return NextResponse.json({ error: 'Provide name, logo, clear_logo, or theme_color to update' }, { status: 400 })
+    }
+
+    if (themeColor !== null && !/^#[0-9A-Fa-f]{6}$/.test(themeColor)) {
+      return NextResponse.json({ error: 'theme_color must be a valid hex color (e.g. #7C3AED)' }, { status: 400 })
     }
 
     // Verify user has access (owner or admin)
@@ -257,6 +269,7 @@ export async function PATCH(request: NextRequest) {
     }
     if (name) updates.name = name
     if (logoUrl !== undefined) updates.logo_url = logoUrl
+    if (themeColor !== null) updates.theme_color = themeColor
 
     const { data: updated, error: updateError } = await admin
       .from('workspaces')

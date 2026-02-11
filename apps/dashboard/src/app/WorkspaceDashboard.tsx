@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 
@@ -26,7 +25,6 @@ interface WorkspaceDashboardProps {
 }
 
 export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: WorkspaceDashboardProps) {
-  const router = useRouter()
   const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -36,12 +34,6 @@ export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: Wo
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
-
-  const handleEnterWorkspace = (workspaceId: string) => {
-    setLoading(workspaceId)
-    // Navigate directly — workspace ID is in the URL
-    router.push(`/w/${workspaceId}/glances`)
-  }
 
   const handleStartRename = (ws: Workspace) => {
     setEditingId(ws.id)
@@ -217,7 +209,12 @@ export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: Wo
                       <div className="workspaceitem">
                         <div className="workspacecard">
                           <div className="workspacerows">
-                            <Link href={workspaceHref} className="workspacelogo-row w-inline-block" style={{ textDecoration: 'none', color: 'inherit' }}>
+                            <Link
+                              href={workspaceHref}
+                              className="workspacelogo-row w-inline-block"
+                              style={{ textDecoration: 'none', color: 'inherit' }}
+                              prefetch={false}
+                            >
                               <div className="workspaceicon">
                                 {(ws.logo_url || (ws.glance_count > 0 && glances[0]?.logo_url)) ? (
                                   <img src={ws.logo_url || glances[0]?.logo_url} loading="lazy" alt="" className="fullimage" />
@@ -232,7 +229,12 @@ export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: Wo
                                 <div className="workspacesubtitle">{ws.glance_count} {ws.glance_count === 1 ? 'Glance' : 'Glances'}</div>
                               </div>
                             </Link>
-                            <Link href={workspaceHref} className="button lite w-inline-block" style={{ textDecoration: 'none' }}>
+                            <Link
+                              href={workspaceHref}
+                              className="button lite w-inline-block"
+                              style={{ textDecoration: 'none' }}
+                              prefetch={false}
+                            >
                               <div>Go to Workspace</div>
                             </Link>
                           </div>
@@ -244,7 +246,13 @@ export default function WorkspaceDashboard({ workspaces: initialWorkspaces }: Wo
                               </div>
                               <div className="glancesrow">
                                 {glances.map((glance) => (
-                                  <Link key={glance.id} href={`/w/${ws.id}/glances/${glance.id}`} className="glancerow w-inline-block" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                  <Link
+                                    key={glance.id}
+                                    href={`/w/${ws.id}/glances/${glance.id}`}
+                                    className="glancerow w-inline-block"
+                                    style={{ textDecoration: 'none', color: 'inherit' }}
+                                    prefetch={false}
+                                  >
                                     <div className="glanceicon">
                                       {glance.logo_url ? (
                                         <img src={glance.logo_url} loading="lazy" alt="" className="fullimage" />
