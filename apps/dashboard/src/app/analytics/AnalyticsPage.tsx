@@ -22,13 +22,17 @@ interface Stats {
   visitors: number
   widgetOpens: number
   uniqueWidgetOpens: number
-  dataEvents: number
+  usersCreated: number
+  formSubmissions: number
+  chatsInitiated: number
   conversionRate: number
   changes: {
     visitors: number
     widgetOpens: number
     uniqueWidgetOpens: number
-    dataEvents: number
+    usersCreated: number
+    formSubmissions: number
+    chatsInitiated: number
     conversionRate: number
   }
 }
@@ -38,7 +42,9 @@ interface TimeSeriesPoint {
   visitors: number
   opens: number
   uniqueOpens: number
-  dataEvents: number
+  usersCreated: number
+  formSubmissions: number
+  chatsInitiated: number
   conversionRate: number
 }
 
@@ -66,7 +72,9 @@ const CHART_STATS = [
   { value: 'visitors', label: 'Total visitors', dataKey: 'visitors', format: 'number' },
   { value: 'widgetOpens', label: 'Widget opens', dataKey: 'opens', format: 'number' },
   { value: 'uniqueWidgetOpens', label: 'Unique widget opens', dataKey: 'uniqueOpens', format: 'number' },
-  { value: 'dataEvents', label: 'Data events', dataKey: 'dataEvents', format: 'number' },
+  { value: 'usersCreated', label: 'Users created', dataKey: 'usersCreated', format: 'number' },
+  { value: 'formSubmissions', label: 'Form submissions', dataKey: 'formSubmissions', format: 'number' },
+  { value: 'chatsInitiated', label: 'Chats initiated', dataKey: 'chatsInitiated', format: 'number' },
   { value: 'conversionRate', label: 'Conversion rate', dataKey: 'conversionRate', format: 'pct' },
 ] as const
 
@@ -154,14 +162,33 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
               <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>Failed to load analytics.</div>
             ) : (
               <>
-                {/* ===== STAT CARDS ===== */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
+                {/* ===== STAT CARDS (Row 1: traffic) ===== */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
                   {[
                     { label: 'Total Visitors', value: formatNumber(data.stats.visitors), change: data.stats.changes.visitors, icon: '/images/playerslite.svg' },
                     { label: 'Widget Opens', value: formatNumber(data.stats.widgetOpens), change: data.stats.changes.widgetOpens, icon: '/images/glance-icon.svg' },
                     { label: 'Unique Widget Opens', value: formatNumber(data.stats.uniqueWidgetOpens), change: data.stats.changes.uniqueWidgetOpens, icon: '/images/glance-icon.svg' },
-                    { label: 'Data Events', value: formatNumber(data.stats.dataEvents), change: data.stats.changes.dataEvents, icon: '/images/forms.svg' },
                     { label: 'Conversion Rate', value: formatPct(data.stats.conversionRate), change: data.stats.changes.conversionRate, icon: '/images/conversion.svg' },
+                  ].map((card, i) => (
+                    <div key={i} className="contentblock" style={{ padding: 20 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <div className="pageicon-block" style={{ width: 32, height: 32 }}>
+                          <img src={card.icon} loading="lazy" alt="" className="heroicon" style={{ width: 18, height: 18 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        </div>
+                        <div className="labeltext">{card.label}</div>
+                      </div>
+                      <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.1, marginBottom: 6 }}>{card.value}</div>
+                      <ChangeIndicator value={card.change} invertColors={card.invert} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* ===== STAT CARDS (Row 2: conversions) ===== */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+                  {[
+                    { label: 'Users Created', value: formatNumber(data.stats.usersCreated), change: data.stats.changes.usersCreated, icon: '/images/users.svg' },
+                    { label: 'Form Submissions', value: formatNumber(data.stats.formSubmissions), change: data.stats.changes.formSubmissions, icon: '/images/forms.svg' },
+                    { label: 'Chats Initiated', value: formatNumber(data.stats.chatsInitiated), change: data.stats.changes.chatsInitiated, icon: '/images/Chats.svg' },
                   ].map((card, i) => (
                     <div key={i} className="contentblock" style={{ padding: 20 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>

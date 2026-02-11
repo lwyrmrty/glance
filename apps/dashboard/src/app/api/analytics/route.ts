@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     if (!widgets || widgets.length === 0) {
       return NextResponse.json({
-        stats: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, dataEvents: 0, conversionRate: 0, changes: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, dataEvents: 0, conversionRate: 0 } },
+        stats: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, conversionRate: 0, changes: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, conversionRate: 0 } },
         timeSeries: [],
         glances: [],
       })
@@ -90,12 +90,14 @@ export async function GET(request: NextRequest) {
       const sessions = new Map<string, Set<string>>()
       let totalOpens = 0
       let formSubmits = 0
+      let chatsStarted = 0
 
       for (const e of evts) {
         if (!sessions.has(e.session_id)) sessions.set(e.session_id, new Set())
         sessions.get(e.session_id)!.add(e.event_type)
         if (e.event_type === 'widget_opened') totalOpens++
         if (e.event_type === 'form_submitted') formSubmits++
+        if (e.event_type === 'chat_started') chatsStarted++
       }
 
       const totalSessions = sessions.size
@@ -109,7 +111,9 @@ export async function GET(request: NextRequest) {
         visitors: totalSessions,
         widgetOpens: totalOpens,
         uniqueWidgetOpens: uniqueWidgetOpensSessions,
-        dataEvents: formSubmits + addAccounts,
+        usersCreated: addAccounts,
+        formSubmissions: formSubmits,
+        chatsInitiated: chatsStarted,
         conversionRate: totalSessions > 0 ? Math.round((uniqueWidgetOpensSessions / totalSessions) * 1000) / 10 : 0,
       }
     }
@@ -128,24 +132,26 @@ export async function GET(request: NextRequest) {
         visitors: pctChange(currentStats.visitors, prevStats.visitors),
         widgetOpens: pctChange(currentStats.widgetOpens, prevStats.widgetOpens),
         uniqueWidgetOpens: pctChange(currentStats.uniqueWidgetOpens, prevStats.uniqueWidgetOpens),
-        dataEvents: pctChange(currentStats.dataEvents, prevStats.dataEvents),
+        usersCreated: pctChange(currentStats.usersCreated, prevStats.usersCreated),
+        formSubmissions: pctChange(currentStats.formSubmissions, prevStats.formSubmissions),
+        chatsInitiated: pctChange(currentStats.chatsInitiated, prevStats.chatsInitiated),
         conversionRate: pctChange(currentStats.conversionRate, prevStats.conversionRate),
       },
     }
 
     // ===== TIME SERIES =====
-    const dateMap = new Map<string, { visitors: Set<string>; opens: number; uniqueOpens: Set<string>; formSubmits: number }>()
+    const dateMap = new Map<string, { visitors: Set<string>; opens: number; uniqueOpens: Set<string>; formSubmits: number; chatsStarted: number }>()
 
     // Pre-fill all days
     for (let d = 0; d < days; d++) {
       const date = new Date(periodStart.getTime() + d * 86400000)
       const key = date.toISOString().split('T')[0]
-      dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0 })
+      dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0, chatsStarted: 0 })
     }
 
     for (const e of events) {
       const key = e.created_at.split('T')[0]
-      if (!dateMap.has(key)) dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0 })
+      if (!dateMap.has(key)) dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0, chatsStarted: 0 })
       const entry = dateMap.get(key)!
       entry.visitors.add(e.session_id)
       if (e.event_type === 'widget_opened') {
@@ -153,6 +159,7 @@ export async function GET(request: NextRequest) {
         entry.uniqueOpens.add(e.session_id)
       }
       if (e.event_type === 'form_submitted') entry.formSubmits++
+      if (e.event_type === 'chat_started') entry.chatsStarted++
     }
 
     // Accounts created per day
@@ -173,7 +180,6 @@ export async function GET(request: NextRequest) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, v]) => {
         const accts = accountsByDate.get(date) ?? 0
-        const dataEvents = v.formSubmits + accts
         const conversionRate = v.visitors.size > 0
           ? Math.round((v.uniqueOpens.size / v.visitors.size) * 1000) / 10
           : 0
@@ -182,7 +188,9 @@ export async function GET(request: NextRequest) {
           visitors: v.visitors.size,
           opens: v.opens,
           uniqueOpens: v.uniqueOpens.size,
-          dataEvents,
+          usersCreated: accts,
+          formSubmissions: v.formSubmits,
+          chatsInitiated: v.chatsStarted,
           conversionRate,
         }
       })
