@@ -141,7 +141,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   const contentImageFileRefs = useRef<Record<number, File>>({})
 
   // Tab links for content link pills
-  const tabLinkNames = tabs.filter((t: any) => t.name?.trim()).map((t: any) => t.name)
+  const tabLinkNames = tabs.filter((t: any) => t.name?.trim() && t.type?.trim()).map((t: any) => t.name)
   const aspectRatioValue = (ratio?: string) => {
     if (!ratio) return undefined
     const map: Record<string, string> = {
@@ -967,17 +967,14 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
   // ===== Preview (right side) =====
   const preview = (
     <div className="widget-content tldr">
-      {/* Hero Banner */}
-      {tldrBannerPreview ? (
+      {/* Hero Banner - hidden when empty */}
+      {tldrBannerPreview && (
         <div className="tabhero" style={tldrBannerAspectRatio ? { aspectRatio: aspectRatioValue(tldrBannerAspectRatio), height: 'auto' } : undefined}>
           <img src={tldrBannerPreview} alt="" className="full-image" loading="lazy" />
         </div>
-      ) : (
-        <div className="tabhero" style={{ background: '#e8e8e8', minHeight: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 12 }}>
-          Banner Image
-        </div>
       )}
-      {/* Name Block */}
+      {/* Name Block - hidden when nothing to show */}
+      {(tldrLogoPreview || tldrTitle.trim() || tldrSubtitle.trim() || tldrSocials.some(s => s.url.trim())) && (
       <div className="course-logo-block">
         <div className="logo-row">
           {tldrLogoPreview && (
@@ -985,10 +982,12 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
               <img src={tldrLogoPreview} alt="" className="full-image" loading="lazy" />
             </div>
           )}
+          {(tldrTitle.trim() || tldrSubtitle.trim()) && (
           <div className="widget-name-block">
-            <div className="widget-name">{tldrTitle || 'Title'}</div>
-            <div className="widget-subname">{tldrSubtitle || 'Subtitle'}</div>
+            {tldrTitle.trim() && <div className="widget-name">{tldrTitle}</div>}
+            {tldrSubtitle.trim() && <div className="widget-subname">{tldrSubtitle}</div>}
           </div>
+          )}
         </div>
         {/* Social Icons */}
         {tldrSocials.some(s => s.url.trim()) && (
@@ -1007,6 +1006,7 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
           </div>
         )}
       </div>
+      )}
       {/* Content Link Rows */}
       {tldrContentLinks.length > 0 && (
         <div className="content-rows">
@@ -1016,78 +1016,78 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
             const isBlackBg = cl.card_background_style === 'black'
             const contenttypeClass = `contenttype${isThemeBg ? ' content-card-theme' : ''}${isBlackBg ? ' content-card-black' : ''}`
             if (contentType === 'row') {
+              if (!cl.imageUrl?.trim() && !cl.title?.trim() && !cl.description?.trim()) return null
               return (
                 <div key={i} content-type="row" className={contenttypeClass}>
                   <a href="#" className="content-row-link w-inline-block" onClick={(e) => e.preventDefault()}>
-                    {cl.imageUrl ? (
+                    {cl.imageUrl?.trim() && (
                       <div className="content-row-image">
                         <img src={cl.imageUrl} alt="" className="full-image" loading="lazy" />
                       </div>
-                    ) : (
-                      <div className="content-row-image" style={{ background: '#e8e8e8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 9 }}>
-                        IMG
-                      </div>
                     )}
+                    {(cl.title?.trim() || cl.description?.trim()) && (
                     <div className="content-row-block">
-                      <div className="content-row-header">{cl.title || 'Title'}</div>
-                      <div className="content-row-subheader">{cl.description || 'Description'}</div>
+                      {cl.title?.trim() && <div className="content-row-header">{cl.title}</div>}
+                      {cl.description?.trim() && <div className="content-row-subheader">{cl.description}</div>}
                     </div>
+                    )}
                   </a>
                 </div>
               )
             }
             if (contentType === 'stack') {
+              if (!cl.imageUrl?.trim() && !cl.title?.trim() && !cl.description?.trim()) return null
               return (
                 <div key={i} content-type="stack" className={contenttypeClass}>
                   <a href="#" className="content-stack-link w-inline-block" onClick={(e) => e.preventDefault()}>
+                    {cl.imageUrl?.trim() && (
                     <div className="content-stack-image" style={{ aspectRatio: aspectRatioValue(cl.aspectRatio) }}>
-                      {cl.imageUrl ? (
-                        <img src={cl.imageUrl} alt="" className="full-image" loading="lazy" />
-                      ) : (
-                        <div className="full-image" style={{ background: '#e8e8e8' }} />
-                      )}
+                      <img src={cl.imageUrl} alt="" className="full-image" loading="lazy" />
                     </div>
+                    )}
+                    {(cl.title?.trim() || cl.description?.trim()) && (
                     <div className="content-stack-block">
-                      <div className="content-stack-header">{cl.title || 'Title'}</div>
-                      <div className="content-stack-subheader">{cl.description || 'Description'}</div>
+                      {cl.title?.trim() && <div className="content-stack-header">{cl.title}</div>}
+                      {cl.description?.trim() && <div className="content-stack-subheader">{cl.description}</div>}
                     </div>
+                    )}
                   </a>
                 </div>
               )
             }
             if (contentType === 'quote') {
+              if (!cl.quoteText?.trim()) return null
               return (
                 <div key={i} content-type="quote" className={contenttypeClass}>
                   <div className="content-quote">
                     <div className="content-quote-wrapper">
-                      <div className="text-block-2">{cl.quoteText || 'Quote text goes here.'}</div>
+                      <div className="text-block-2">{cl.quoteText}</div>
                     </div>
+                    {(cl.imageUrl?.trim() || cl.quoteName?.trim() || cl.quoteTitle?.trim()) && (
                     <div className="contentquote-row">
-                      <div className="content-quote-image">
-                        {cl.imageUrl ? (
+                      {cl.imageUrl?.trim() && (
+                        <div className="content-quote-image">
                           <img src={cl.imageUrl} alt="" className="full-image" loading="lazy" />
-                        ) : (
-                          <div className="full-image" style={{ background: '#e8e8e8' }} />
-                        )}
-                      </div>
+                        </div>
+                      )}
+                      {(cl.quoteName?.trim() || cl.quoteTitle?.trim()) && (
                       <div>
-                        <div className="content-quote-name">{cl.quoteName || 'Name'}</div>
-                        <div className="content-quote-title">{cl.quoteTitle || 'Title'}</div>
+                        {cl.quoteName?.trim() && <div className="content-quote-name">{cl.quoteName}</div>}
+                        {cl.quoteTitle?.trim() && <div className="content-quote-title">{cl.quoteTitle}</div>}
                       </div>
+                      )}
                     </div>
+                    )}
                   </div>
                 </div>
               )
             }
             if (contentType === 'photo') {
+              if (!cl.imageUrl?.trim()) return null
               return (
                 <div key={i} content-type="photo" className={contenttypeClass}>
                   <div className="galleryimage" style={{ aspectRatio: aspectRatioValue(cl.aspectRatio) }}>
-                    {cl.imageUrl ? (
-                      <img src={cl.imageUrl} alt="" className="full-image" loading="lazy" />
-                    ) : (
-                      <div className="full-image" style={{ background: '#e8e8e8' }} />
-                    )}
+                    <img src={cl.imageUrl} alt="" className="full-image" loading="lazy" />
                     {cl.imageLabel?.trim() && (
                       <div className="imageoverlay">
                         <div>{cl.imageLabel}</div>
@@ -1098,13 +1098,14 @@ export function useTldrTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
               )
             }
             if (contentType === 'video') {
+              if (!cl.videoUrl?.trim()) return null
               return (
                 <div key={i} content-type="video" className={contenttypeClass}>
                   <div className="videowrapper">
                     <div style={{ paddingTop: '56.17021276595745%' }} className="w-video w-embed">
                       <iframe
                         className="embedly-embed"
-                        src={cl.videoUrl || ''}
+                        src={cl.videoUrl}
                         width="940"
                         height="528"
                         scrolling="no"

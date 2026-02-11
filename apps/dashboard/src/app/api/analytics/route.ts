@@ -6,9 +6,8 @@ import { NextRequest, NextResponse } from 'next/server'
  * GET /api/analytics?workspace_id=...&period=7d|30d|90d
  *
  * Returns aggregated analytics for a workspace:
- *   stats      — visitor count, opens, bounce rate, conversion rate + change vs previous period
- *   timeSeries — daily visitors + opens
- *   peakHours  — 7x24 grid of open counts (dow x hour)
+ *   stats      — visitor count, widget opens, unique widget opens, conversion rate + change vs previous period
+ *   timeSeries — daily visitors, opens, uniqueOpens
  *   glances    — per-widget breakdown
  */
 export async function GET(request: NextRequest) {
@@ -27,7 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing workspace_id' }, { status: 400 })
   }
 
-  const days = period === '90d' ? 90 : period === '30d' ? 30 : 7
+  const days = period === '90d' ? 90 : period === '30d' ? 30 : period === '24h' ? 1 : 7
   const now = new Date()
   const periodStart = new Date(now.getTime() - days * 86400000)
   const prevStart = new Date(periodStart.getTime() - days * 86400000)
@@ -43,9 +42,8 @@ export async function GET(request: NextRequest) {
 
     if (!widgets || widgets.length === 0) {
       return NextResponse.json({
-        stats: { visitors: 0, widgetOpens: 0, bounceRate: 0, conversionRate: 0, changes: { visitors: 0, widgetOpens: 0, bounceRate: 0, conversionRate: 0 } },
+        stats: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, dataEvents: 0, conversionRate: 0, changes: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, dataEvents: 0, conversionRate: 0 } },
         timeSeries: [],
-        peakHours: Array.from({ length: 7 }, () => Array(24).fill(0)),
         glances: [],
       })
     }
@@ -72,36 +70,52 @@ export async function GET(request: NextRequest) {
     const events = currentEvents ?? []
     const prev = prevEvents ?? []
 
+    // Accounts created (widget_users) in current and previous period
+    const { count: accountsCreated } = await supabase
+      .from('widget_users')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .gte('created_at', periodStart.toISOString())
+      .lte('created_at', now.toISOString())
+
+    const { count: prevAccountsCreated } = await supabase
+      .from('widget_users')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .gte('created_at', prevStart.toISOString())
+      .lt('created_at', periodStart.toISOString())
+
     // ===== STATS =====
-    const calcStats = (evts: typeof events) => {
+    const calcStats = (evts: typeof events, addAccounts: number) => {
       const sessions = new Map<string, Set<string>>()
-      let opens = 0
+      let totalOpens = 0
+      let formSubmits = 0
 
       for (const e of evts) {
         if (!sessions.has(e.session_id)) sessions.set(e.session_id, new Set())
         sessions.get(e.session_id)!.add(e.event_type)
-        if (e.event_type === 'widget_opened') opens++
+        if (e.event_type === 'widget_opened') totalOpens++
+        if (e.event_type === 'form_submitted') formSubmits++
       }
 
       const totalSessions = sessions.size
-      let bounceSessions = 0
-      let convertedSessions = 0
+      let uniqueWidgetOpensSessions = 0
 
       for (const [, types] of sessions) {
-        if (types.size <= 1) bounceSessions++
-        if (types.has('form_submitted') || types.has('chat_started')) convertedSessions++
+        if (types.has('widget_opened')) uniqueWidgetOpensSessions++
       }
 
       return {
         visitors: totalSessions,
-        widgetOpens: opens,
-        bounceRate: totalSessions > 0 ? Math.round((bounceSessions / totalSessions) * 1000) / 10 : 0,
-        conversionRate: totalSessions > 0 ? Math.round((convertedSessions / totalSessions) * 1000) / 10 : 0,
+        widgetOpens: totalOpens,
+        uniqueWidgetOpens: uniqueWidgetOpensSessions,
+        dataEvents: formSubmits + addAccounts,
+        conversionRate: totalSessions > 0 ? Math.round((uniqueWidgetOpensSessions / totalSessions) * 1000) / 10 : 0,
       }
     }
 
-    const currentStats = calcStats(events)
-    const prevStats = calcStats(prev)
+    const currentStats = calcStats(events, accountsCreated ?? 0)
+    const prevStats = calcStats(prev, prevAccountsCreated ?? 0)
 
     const pctChange = (curr: number, prev: number) => {
       if (prev === 0) return curr > 0 ? 100 : 0
@@ -113,43 +127,65 @@ export async function GET(request: NextRequest) {
       changes: {
         visitors: pctChange(currentStats.visitors, prevStats.visitors),
         widgetOpens: pctChange(currentStats.widgetOpens, prevStats.widgetOpens),
-        bounceRate: pctChange(currentStats.bounceRate, prevStats.bounceRate),
+        uniqueWidgetOpens: pctChange(currentStats.uniqueWidgetOpens, prevStats.uniqueWidgetOpens),
+        dataEvents: pctChange(currentStats.dataEvents, prevStats.dataEvents),
         conversionRate: pctChange(currentStats.conversionRate, prevStats.conversionRate),
       },
     }
 
     // ===== TIME SERIES =====
-    const dateMap = new Map<string, { visitors: Set<string>; opens: number }>()
+    const dateMap = new Map<string, { visitors: Set<string>; opens: number; uniqueOpens: Set<string>; formSubmits: number }>()
 
     // Pre-fill all days
     for (let d = 0; d < days; d++) {
       const date = new Date(periodStart.getTime() + d * 86400000)
       const key = date.toISOString().split('T')[0]
-      dateMap.set(key, { visitors: new Set(), opens: 0 })
+      dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0 })
     }
 
     for (const e of events) {
       const key = e.created_at.split('T')[0]
-      if (!dateMap.has(key)) dateMap.set(key, { visitors: new Set(), opens: 0 })
+      if (!dateMap.has(key)) dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0 })
       const entry = dateMap.get(key)!
       entry.visitors.add(e.session_id)
-      if (e.event_type === 'widget_opened') entry.opens++
+      if (e.event_type === 'widget_opened') {
+        entry.opens++
+        entry.uniqueOpens.add(e.session_id)
+      }
+      if (e.event_type === 'form_submitted') entry.formSubmits++
+    }
+
+    // Accounts created per day
+    const { data: newAccounts } = await supabase
+      .from('widget_users')
+      .select('created_at')
+      .eq('workspace_id', workspaceId)
+      .gte('created_at', periodStart.toISOString())
+      .lte('created_at', now.toISOString())
+
+    const accountsByDate = new Map<string, number>()
+    for (const a of newAccounts ?? []) {
+      const key = a.created_at.split('T')[0]
+      accountsByDate.set(key, (accountsByDate.get(key) ?? 0) + 1)
     }
 
     const timeSeries = Array.from(dateMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date, visitors: v.visitors.size, opens: v.opens }))
-
-    // ===== PEAK HOURS =====
-    // 7 (dow: 0=Sun..6=Sat) x 24 (hour)
-    const peakHours: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0))
-
-    for (const e of events) {
-      if (e.event_type === 'widget_opened') {
-        const d = new Date(e.created_at)
-        peakHours[d.getUTCDay()][d.getUTCHours()]++
-      }
-    }
+      .map(([date, v]) => {
+        const accts = accountsByDate.get(date) ?? 0
+        const dataEvents = v.formSubmits + accts
+        const conversionRate = v.visitors.size > 0
+          ? Math.round((v.uniqueOpens.size / v.visitors.size) * 1000) / 10
+          : 0
+        return {
+          date,
+          visitors: v.visitors.size,
+          opens: v.opens,
+          uniqueOpens: v.uniqueOpens.size,
+          dataEvents,
+          conversionRate,
+        }
+      })
 
     // ===== PER-GLANCE BREAKDOWN =====
     const glanceMap = new Map<string, { sessions: Map<string, { types: Set<string>; first: number; last: number }> }>()
@@ -171,12 +207,10 @@ export async function GET(request: NextRequest) {
 
     const glances = Array.from(glanceMap.entries()).map(([widgetId, data]) => {
       const totalSessions = data.sessions.size
-      let bounced = 0
       let totalDuration = 0
       let durationCount = 0
 
       for (const [, s] of data.sessions) {
-        if (s.types.size <= 1) bounced++
         const duration = (s.last - s.first) / 1000
         if (duration > 0) {
           totalDuration += duration
@@ -188,12 +222,11 @@ export async function GET(request: NextRequest) {
         id: widgetId,
         name: widgetNameMap[widgetId] || 'Unknown',
         visitors: totalSessions,
-        bounceRate: totalSessions > 0 ? Math.round((bounced / totalSessions) * 1000) / 10 : 0,
         avgSessionSeconds: durationCount > 0 ? Math.round(totalDuration / durationCount) : 0,
       }
     }).sort((a, b) => b.visitors - a.visitors)
 
-    return NextResponse.json({ stats, timeSeries, peakHours, glances })
+    return NextResponse.json({ stats, timeSeries, glances })
   } catch (err) {
     console.error('[Glance] Analytics error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -735,10 +735,12 @@ export function useFormTab({ tab, glanceId, tabIndex, glanceName, themeColor, ta
           <img src={tldrBannerPreview} alt="" className="full-image" loading="lazy" />
         </div>
       )}
+      {(tldrTitle.trim() || tldrSubtitle.trim()) && (
       <div className="tabheading-wrap">
-        <div className="tab-heading">{tldrTitle || 'Title'}</div>
-        <div className="tab-subheading">{tldrSubtitle || 'Subtitle'}</div>
+        {tldrTitle.trim() && <div className="tab-heading">{tldrTitle}</div>}
+        {tldrSubtitle.trim() && <div className="tab-subheading">{tldrSubtitle}</div>}
       </div>
+      )}
       <div className="formcontent-wrap">
         <div className="formblocks">
           <form className="formwrap" onSubmit={(e) => e.preventDefault()}>

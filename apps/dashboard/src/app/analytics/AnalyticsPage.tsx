@@ -21,12 +21,14 @@ interface AnalyticsPageProps {
 interface Stats {
   visitors: number
   widgetOpens: number
-  bounceRate: number
+  uniqueWidgetOpens: number
+  dataEvents: number
   conversionRate: number
   changes: {
     visitors: number
     widgetOpens: number
-    bounceRate: number
+    uniqueWidgetOpens: number
+    dataEvents: number
     conversionRate: number
   }
 }
@@ -35,42 +37,42 @@ interface TimeSeriesPoint {
   date: string
   visitors: number
   opens: number
+  uniqueOpens: number
+  dataEvents: number
+  conversionRate: number
 }
 
 interface GlanceRow {
   id: string
   name: string
   visitors: number
-  bounceRate: number
   avgSessionSeconds: number
 }
 
 interface AnalyticsData {
   stats: Stats
   timeSeries: TimeSeriesPoint[]
-  peakHours: number[][]
   glances: GlanceRow[]
 }
 
 const PERIODS = [
+  { value: '24h', label: 'Last 24 hours' },
   { value: '7d', label: 'Last 7 days' },
   { value: '30d', label: 'Last 30 days' },
   { value: '90d', label: 'Last 90 days' },
 ]
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => {
-  if (i === 0) return '12am'
-  if (i < 12) return `${i}am`
-  if (i === 12) return '12pm'
-  return `${i - 12}pm`
-})
-
-// Show a subset of hours for the heatmap (9am - 9pm)
-const HEATMAP_HOURS = Array.from({ length: 13 }, (_, i) => i + 9) // 9..21
+const CHART_STATS = [
+  { value: 'visitors', label: 'Total visitors', dataKey: 'visitors', format: 'number' },
+  { value: 'widgetOpens', label: 'Widget opens', dataKey: 'opens', format: 'number' },
+  { value: 'uniqueWidgetOpens', label: 'Unique widget opens', dataKey: 'uniqueOpens', format: 'number' },
+  { value: 'dataEvents', label: 'Data events', dataKey: 'dataEvents', format: 'number' },
+  { value: 'conversionRate', label: 'Conversion rate', dataKey: 'conversionRate', format: 'pct' },
+] as const
 
 export function AnalyticsPage({ workspaceName, workspaceId, glances }: AnalyticsPageProps) {
   const [period, setPeriod] = useState('7d')
+  const [chartStat, setChartStat] = useState<(typeof CHART_STATS)[number]['value']>('uniqueWidgetOpens')
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -124,9 +126,6 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
     )
   }
 
-  // Peak hours max for heatmap color scaling
-  const peakMax = data ? Math.max(1, ...data.peakHours.flat()) : 1
-
   // Glance max visitors for bar width scaling
   const glanceMaxVisitors = data ? Math.max(1, ...data.glances.map(g => g.visitors)) : 1
 
@@ -140,7 +139,7 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
             <div className="innerhero">
               <div className="herorow">
                 <div className="pageicon-block large">
-                  <img src="/images/stats.svg" loading="lazy" alt="" className="heroicon" />
+                  <img src="/images/stats-white.svg" loading="lazy" alt="" className="heroicon" />
                 </div>
                 <div className="alignrow alignbottom">
                   <h1 className="pageheading">Analytics</h1>
@@ -156,11 +155,12 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
             ) : (
               <>
                 {/* ===== STAT CARDS ===== */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
                   {[
                     { label: 'Total Visitors', value: formatNumber(data.stats.visitors), change: data.stats.changes.visitors, icon: '/images/playerslite.svg' },
                     { label: 'Widget Opens', value: formatNumber(data.stats.widgetOpens), change: data.stats.changes.widgetOpens, icon: '/images/glance-icon.svg' },
-                    { label: 'Bounce Rate', value: formatPct(data.stats.bounceRate), change: data.stats.changes.bounceRate, invert: true, icon: '/images/bounce.svg' },
+                    { label: 'Unique Widget Opens', value: formatNumber(data.stats.uniqueWidgetOpens), change: data.stats.changes.uniqueWidgetOpens, icon: '/images/glance-icon.svg' },
+                    { label: 'Data Events', value: formatNumber(data.stats.dataEvents), change: data.stats.changes.dataEvents, icon: '/images/forms.svg' },
                     { label: 'Conversion Rate', value: formatPct(data.stats.conversionRate), change: data.stats.changes.conversionRate, icon: '/images/conversion.svg' },
                   ].map((card, i) => (
                     <div key={i} className="contentblock" style={{ padding: 20 }}>
@@ -176,30 +176,45 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
                   ))}
                 </div>
 
-                {/* ===== MIDDLE ROW: Traffic + Peak Hours ===== */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 24 }}>
-                  {/* Traffic Overview */}
+                {/* ===== Traffic Overview (full width) ===== */}
+                <div style={{ marginBottom: 24 }}>
                   <div className="contentblock" style={{ padding: 20 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                      <div style={{ fontSize: 16, fontWeight: 600 }}>Traffic overview</div>
-                      <select
-                        value={period}
-                        onChange={(e) => setPeriod(e.target.value)}
-                        className="formfields w-input"
-                        style={{ width: 'auto', padding: '6px 12px', fontSize: 13 }}
-                      >
-                        {PERIODS.map(p => (
-                          <option key={p.value} value={p.value}>{p.label}</option>
-                        ))}
-                      </select>
+                      <div style={{ fontSize: 16, fontWeight: 600 }}>
+                        {CHART_STATS.find(s => s.value === chartStat)?.label ?? chartStat}
+                      </div>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <select
+                          value={chartStat}
+                          onChange={(e) => setChartStat(e.target.value as (typeof CHART_STATS)[number]['value'])}
+                          className="formfields w-input"
+                          style={{ width: 'auto', padding: '6px 12px', fontSize: 13 }}
+                        >
+                          {CHART_STATS.map(s => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={period}
+                          onChange={(e) => setPeriod(e.target.value)}
+                          className="formfields w-input"
+                          style={{ width: 'auto', padding: '6px 12px', fontSize: 13 }}
+                        >
+                          {PERIODS.map(p => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{formatNumber(data.stats.visitors)}</div>
-                    <ChangeIndicator value={data.stats.changes.visitors} />
+                    <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>
+                      {chartStat === 'conversionRate' ? formatPct(data.stats.conversionRate) : formatNumber(data.stats[chartStat])}
+                    </div>
+                    <ChangeIndicator value={data.stats.changes[chartStat]} />
                     <div style={{ height: 220, marginTop: 20 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={data.timeSeries} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                           <defs>
-                            <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
+                            <linearGradient id="colorChart" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#000000" stopOpacity={0.1} />
                               <stop offset="95%" stopColor="#000000" stopOpacity={0} />
                             </linearGradient>
@@ -216,81 +231,28 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
                             tick={{ fontSize: 11, fill: '#999' }}
                             axisLine={false}
                             tickLine={false}
-                            allowDecimals={false}
+                            allowDecimals={chartStat === 'conversionRate'}
+                            tickFormatter={(v: number) => chartStat === 'conversionRate' ? `${v}%` : formatNumber(v)}
                           />
                           <Tooltip
                             contentStyle={{ borderRadius: 8, border: '1px solid #e0e0e0', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: 13 }}
                             labelFormatter={formatChartDate}
-                            formatter={(value: number, name: string) => [formatNumber(value), name === 'visitors' ? 'Visitors' : 'Opens']}
+                            formatter={(value: number) => [
+                              chartStat === 'conversionRate' ? formatPct(value) : formatNumber(value),
+                              CHART_STATS.find(s => s.value === chartStat)?.label ?? chartStat,
+                            ]}
                           />
                           <Area
                             type="monotone"
-                            dataKey="visitors"
+                            dataKey={CHART_STATS.find(s => s.value === chartStat)?.dataKey ?? 'uniqueOpens'}
                             stroke="#000000"
                             strokeWidth={2}
-                            fill="url(#colorVisitors)"
+                            fill="url(#colorChart)"
                             dot={false}
                             activeDot={{ r: 5, fill: '#000000', stroke: '#fff', strokeWidth: 2 }}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Peak Hours Heatmap */}
-                  <div className="contentblock" style={{ padding: 20 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                      <div style={{ fontSize: 16, fontWeight: 600 }}>Peak hours</div>
-                    </div>
-                    <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>
-                      {formatNumber(Math.max(...data.peakHours.flat()))}
-                    </div>
-                    <div style={{ fontSize: 13, color: '#999', marginBottom: 16 }}>visitors in peak hour</div>
-
-                    {/* Heatmap Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: `40px repeat(${DAY_LABELS.length}, 1fr)`, gap: 3, fontSize: 11 }}>
-                      {/* Header row */}
-                      <div></div>
-                      {DAY_LABELS.map(d => (
-                        <div key={d} style={{ textAlign: 'center', color: '#999', paddingBottom: 4 }}>{d}</div>
-                      ))}
-
-                      {/* Hour rows */}
-                      {HEATMAP_HOURS.map(hour => (
-                        <div key={hour} style={{ display: 'contents' }}>
-                          <div style={{ color: '#999', textAlign: 'right', paddingRight: 6, lineHeight: '22px' }}>
-                            {HOUR_LABELS[hour]}
-                          </div>
-                          {DAY_LABELS.map((_, dow) => {
-                            const count = data.peakHours[dow]?.[hour] ?? 0
-                            const intensity = count / peakMax
-                            return (
-                              <div
-                                key={dow}
-                                title={`${DAY_LABELS[dow]} ${HOUR_LABELS[hour]}: ${count} opens`}
-                                style={{
-                                  borderRadius: 4,
-                                  height: 22,
-                                  backgroundColor: count === 0
-                                    ? '#f5f5f5'
-                                    : `rgba(124, 58, 237, ${0.12 + intensity * 0.88})`,
-                                  transition: 'background-color 0.2s',
-                                }}
-                              />
-                            )
-                          })}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Legend */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 11, color: '#999' }}>
-                      <div style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: 'rgba(124,58,237,0.15)' }} />
-                      <span>Low</span>
-                      <div style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: 'rgba(124,58,237,0.5)' }} />
-                      <span>Medium</span>
-                      <div style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: 'rgba(124,58,237,1)' }} />
-                      <span>High</span>
                     </div>
                   </div>
                 </div>
@@ -311,7 +273,6 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
                       </div>
                       <div className="tablerow-right" style={{ display: 'flex', gap: 0 }}>
                         <div style={{ width: 200, textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#999', padding: '12px 16px' }}>Visitors</div>
-                        <div style={{ width: 120, textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#999', padding: '12px 16px' }}>Bounce rate</div>
                         <div style={{ width: 150, textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#999', padding: '12px 16px' }}>Avg. time per session</div>
                       </div>
                     </div>
@@ -350,9 +311,6 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
                                   }} />
                                 </div>
                                 <div style={{ fontSize: 13, fontWeight: 500, minWidth: 40, textAlign: 'right' }}>{formatNumber(g.visitors)}</div>
-                              </div>
-                              <div style={{ width: 120, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 16px', fontSize: 13 }}>
-                                {formatPct(g.bounceRate)}
                               </div>
                               <div style={{ width: 150, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 16px', fontSize: 13 }}>
                                 {formatDuration(g.avgSessionSeconds)}
