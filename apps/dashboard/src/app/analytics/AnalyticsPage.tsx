@@ -25,6 +25,7 @@ interface Stats {
   usersCreated: number
   formSubmissions: number
   chatsInitiated: number
+  messagesSent: number
   conversionRate: number
   changes: {
     visitors: number
@@ -33,6 +34,7 @@ interface Stats {
     usersCreated: number
     formSubmissions: number
     chatsInitiated: number
+    messagesSent: number
     conversionRate: number
   }
 }
@@ -45,6 +47,7 @@ interface TimeSeriesPoint {
   usersCreated: number
   formSubmissions: number
   chatsInitiated: number
+  messagesSent: number
   conversionRate: number
 }
 
@@ -75,6 +78,7 @@ const CHART_STATS = [
   { value: 'usersCreated', label: 'Users created', dataKey: 'usersCreated', format: 'number' },
   { value: 'formSubmissions', label: 'Form submissions', dataKey: 'formSubmissions', format: 'number' },
   { value: 'chatsInitiated', label: 'Chats initiated', dataKey: 'chatsInitiated', format: 'number' },
+  { value: 'messagesSent', label: 'Messages sent', dataKey: 'messagesSent', format: 'number' },
   { value: 'conversionRate', label: 'Conversion rate', dataKey: 'conversionRate', format: 'pct' },
 ] as const
 
@@ -184,11 +188,12 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
                 </div>
 
                 {/* ===== STAT CARDS (Row 2: conversions) ===== */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
                   {[
                     { label: 'Users Created', value: formatNumber(data.stats.usersCreated), change: data.stats.changes.usersCreated, icon: '/images/users.svg' },
                     { label: 'Form Submissions', value: formatNumber(data.stats.formSubmissions), change: data.stats.changes.formSubmissions, icon: '/images/forms.svg' },
                     { label: 'Chats Initiated', value: formatNumber(data.stats.chatsInitiated), change: data.stats.changes.chatsInitiated, icon: '/images/Chats.svg' },
+                    { label: 'Messages Sent', value: formatNumber(data.stats.messagesSent), change: data.stats.changes.messagesSent, icon: '/images/Chats.svg' },
                   ].map((card, i) => (
                     <div key={i} className="contentblock" style={{ padding: 20 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>

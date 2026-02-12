@@ -1,729 +1,561 @@
-# Chat & Knowledge Base Integration
+# Glance: Chat & Knowledge Base — Implementation Guide
 
-How BirdieBot connects its Knowledge Base to its AI Chat widget — a full RAG (Retrieval-Augmented Generation) implementation reference.
+How Glance imports and stores knowledge, then passes it to the AI chat widget. A full **RAG (Retrieval-Augmented Generation)** implementation reference for replicating this in another project.
 
 ---
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Data Models](#data-models)
-3. [The Write Path — Storing Knowledge](#the-write-path--storing-knowledge)
-4. [The Read Path — Chat Uses Knowledge](#the-read-path--chat-uses-knowledge)
-5. [Embedding Generation](#embedding-generation)
-6. [Chunking Strategy](#chunking-strategy)
-7. [Semantic + Hybrid Search](#semantic--hybrid-search)
-8. [Context Formatting for the AI](#context-formatting-for-the-ai)
-9. [System Prompt Design](#system-prompt-design)
-10. [OpenAI API Call](#openai-api-call)
-11. [Streaming Responses (SSE)](#streaming-responses-sse)
-12. [Widget Frontend — Sending & Receiving](#widget-frontend--sending--receiving)
-13. [Session Tracking](#session-tracking)
-14. [Key Files Reference](#key-files-reference)
+1. [Architecture Overview](#1-architecture-overview)
+2. [Database Schema](#2-database-schema)
+3. [Knowledge Source Types & Ingestion](#3-knowledge-source-types--ingestion)
+4. [The Write Path — Importing & Storing Knowledge](#4-the-write-path--importing--storing-knowledge)
+5. [Chunking Strategies](#5-chunking-strategies)
+6. [Embedding Generation](#6-embedding-generation)
+7. [Vector Search (pgvector)](#7-vector-search-pgvector)
+8. [Linking Knowledge to Chat Tabs](#8-linking-knowledge-to-chat-tabs)
+9. [The Read Path — Chat RAG Flow](#9-the-read-path--chat-rag-flow)
+10. [Context Formatting for the LLM](#10-context-formatting-for-the-llm)
+11. [System Prompt Design](#11-system-prompt-design)
+12. [Streaming Responses (SSE)](#12-streaming-responses-sse)
+13. [Widget Frontend — Sending & Receiving](#13-widget-frontend--sending--receiving)
+14. [Key Files Reference](#14-key-files-reference)
+15. [Replication Checklist](#15-replication-checklist)
 
 ---
 
-## Architecture Overview
+## 1. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  WRITE PATH (Admin adds knowledge)                              │
-│                                                                 │
-│  Admin UI ──► POST /api/knowledge ──► KnowledgeItem (DB)        │
-│                                         │                       │
-│                        ┌────────────────┘                       │
-│                        ▼                                        │
-│                   chunkText()                                   │
-│                        │                                        │
-│                        ▼                                        │
-│              generateEmbeddings()  ──► OpenAI text-embedding    │
-│                        │               -3-small                 │
-│                        ▼                                        │
-│               KnowledgeChunk (DB)  ──► pgvector column          │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  WRITE PATH (Admin adds knowledge via dashboard)                            │
+│                                                                             │
+│  Knowledge Page UI ──► POST /api/knowledge ──► Create knowledge_sources row  │
+│       │                         │                        │                  │
+│       │                         │                        ▼                  │
+│       │                         │              Fetch content (Google Doc,     │
+│       │                         │              Airtable, website crawl,     │
+│       │                         │              or use pasted markdown)       │
+│       │                         │                        │                  │
+│       │                         │                        ▼                  │
+│       │                         │              chunkText() / chunkWebsite   │
+│       │                         │              / chunkTabularText           │
+│       │                         │                        │                  │
+│       │                         │                        ▼                  │
+│       │                         │              generateEmbeddings()          │
+│       │                         │              → OpenAI text-embedding-3     │
+│       │                         │              -small                        │
+│       │                         │                        │                  │
+│       │                         │                        ▼                  │
+│       │                         │              knowledge_chunks rows         │
+│       │                         │              (content + embedding vector)   │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│  READ PATH (User chats)                                         │
-│                                                                 │
-│  Widget ──► POST /api/widget/chat/stream                        │
-│                    │                                            │
-│                    ▼                                            │
-│            searchKnowledgeBase()                                │
-│                    │                                            │
-│          ┌─────────┴──────────┐                                 │
-│          ▼                    ▼                                  │
-│   generateEmbedding()   extractKeywords()                       │
-│   (query → vector)      (query → terms)                         │
-│          │                    │                                  │
-│          └────────┬───────────┘                                  │
-│                   ▼                                             │
-│        pgvector cosine search  ──►  Hybrid re-ranking           │
-│        (0.7 semantic + 0.3 keyword)                             │
-│                   │                                             │
-│                   ▼                                             │
-│        buildContextFromChunks()                                 │
-│                   │                                             │
-│                   ▼                                             │
-│        [system prompt] + [knowledge context] + [history]        │
-│                   │                                             │
-│                   ▼                                             │
-│          OpenAI gpt-4o-mini  (stream: true)                     │
-│                   │                                             │
-│                   ▼                                             │
-│          SSE chunks ──► Widget renders progressively            │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LINKING (Admin configures chat tab)                                         │
+│                                                                             │
+│  Tab Editor (Chat Settings) ──► Select knowledge sources ──► Save            │
+│       │                                                                     │
+│       ▼                                                                     │
+│  widgets.button_style.tabs[tabIndex].knowledge_sources = [uuid, uuid, ...]  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  READ PATH (Visitor chats in widget)                                         │
+│                                                                             │
+│  Widget ──► POST /api/chat { widgetId, tabIndex, message, history }         │
+│                    │                                                        │
+│                    ▼                                                        │
+│            Load widget + tab config from DB                                  │
+│            knowledgeSourceIds = tab.knowledge_sources                        │
+│                    │                                                        │
+│                    ▼                                                        │
+│            Embed user message (OpenAI text-embedding-3-small)                │
+│                    │                                                        │
+│                    ▼                                                        │
+│            match_knowledge_chunks(query_embedding, source_ids)               │
+│            → pgvector cosine similarity search                              │
+│                    │                                                        │
+│                    ▼                                                        │
+│            Hybrid re-ranking (70% semantic + 30% keyword)                    │
+│                    │                                                        │
+│                    ▼                                                        │
+│            buildContextFromChunks() → inject into system prompt              │
+│                    │                                                        │
+│                    ▼                                                        │
+│            [system prompt] + [knowledge context] + [history] + [message]    │
+│                    │                                                        │
+│                    ▼                                                        │
+│            OpenAI gpt-4.1-mini (stream: true)                                │
+│                    │                                                        │
+│                    ▼                                                        │
+│            SSE stream ──► Widget renders tokens progressively               │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The pattern is **RAG** — Retrieval-Augmented Generation. The AI never relies on its own training data for course-specific facts. Instead, every chat query first searches the knowledge base for relevant content, injects that content into the prompt, and the AI answers from it.
+**Core principle:** The AI never relies on its training data for domain-specific facts. Every chat query first searches the knowledge base, injects retrieved chunks into the prompt, and the model answers only from that context.
 
 ---
 
-## Data Models
-
-### KnowledgeItem (`models/KnowledgeItem.js`)
-
-The parent record for each knowledge resource (a document, a URL, or a PDF).
-
-```javascript
-{
-  id:                INTEGER, PRIMARY KEY,
-  userId:            INTEGER, FK → users,
-  courseId:          INTEGER, FK → courses,
-  name:             STRING,           // "Hours & Rates", "Course Map"
-  content:          TEXT,             // Full text content
-  usageInstructions: TEXT,            // Tells the AI when to use this resource
-  sourceType:       ENUM('manual', 'url', 'pdf'),
-  sourceUrl:        STRING,           // Original URL (for re-crawling)
-  sourceFileName:   STRING,           // Original PDF filename
-  crawlEntireSite:  BOOLEAN,          // Crawl all pages or just one
-  lastSyncedAt:     DATE,
-  category:         STRING,
-  tags:             STRING,           // Comma-separated
-  isActive:         BOOLEAN           // Toggle on/off without deleting
-}
-```
-
-### KnowledgeChunk (`models/KnowledgeChunk.js`)
-
-Chunked + embedded pieces of a KnowledgeItem. This is what semantic search queries against.
-
-```javascript
-{
-  id:               INTEGER, PRIMARY KEY,
-  knowledgeItemId:  INTEGER, FK → knowledge_items (CASCADE delete),
-  userId:           INTEGER, FK → users,
-  courseId:         INTEGER, FK → courses,
-  content:          TEXT,             // ~1200 char chunk of text
-  sourceUrl:        STRING,           // Which page this came from (for multi-page crawls)
-  chunkIndex:       INTEGER,          // Order within the parent item
-  embedding:        vector(1536),     // pgvector column — OpenAI embedding
-  tokenCount:       INTEGER           // Estimated token count
-}
-```
-
-The `embedding` column uses PostgreSQL's **pgvector** extension. The model has custom getter/setter to convert between JS arrays and Postgres vector strings:
-
-```javascript
-embedding: {
-  type: 'vector(1536)',
-  get() {
-    const value = this.getDataValue('embedding');
-    if (typeof value === 'string') {
-      return JSON.parse(value);  // '[0.1,0.2,...]' → [0.1, 0.2, ...]
-    }
-    return value;
-  },
-  set(value) {
-    if (Array.isArray(value)) {
-      this.setDataValue('embedding', `[${value.join(',')}]`);
-    }
-  }
-}
-```
-
-### ChatSession (`models/ChatSession.js`)
-
-Tracks a conversation between a visitor and the bot.
-
-```javascript
-{
-  id:              INTEGER, PRIMARY KEY,
-  sessionUuid:     STRING,   // Short format: "02-A3F8K2"
-  playerId:        INTEGER,  // FK → waitlist_users (if known)
-  courseId:        INTEGER,  // FK → courses
-  messageCount:    INTEGER,
-  status:          ENUM('active', 'closed'),
-  lastActivityAt:  DATE
-}
-```
-
-### ChatMessage (`models/ChatMessage.js`)
-
-Individual messages within a session.
-
-```javascript
-{
-  id:             INTEGER, PRIMARY KEY,
-  message:        TEXT,
-  isFromBot:      BOOLEAN,
-  chatSessionId:  INTEGER,  // FK → chat_sessions
-  userId:         INTEGER   // Course owner's user ID
-}
-```
-
-### Relationships
-
-```javascript
-KnowledgeItem.hasMany(KnowledgeChunk, {
-  foreignKey: 'knowledgeItemId', as: 'chunks', onDelete: 'CASCADE'
-});
-
-ChatSession.hasMany(ChatMessage, {
-  foreignKey: 'chatSessionId', as: 'messages'
-});
-```
-
----
-
-## The Write Path — Storing Knowledge
-
-When an admin creates or updates a knowledge resource, here's what happens:
-
-### 1. Admin saves a resource → `POST /api/knowledge`
-
-```javascript
-// routes/knowledge.js
-const item = await KnowledgeItem.create({
-  userId, courseId, name, content,
-  usageInstructions, sourceType, sourceUrl,
-  crawlEntireSite, category, tags,
-  lastSyncedAt: new Date()
-});
-```
-
-### 2. URL resources get crawled automatically
-
-```javascript
-if (sourceType === 'url' && sourceUrl) {
-  // Async — doesn't block the API response
-  crawlWebsite(item.id, sourceUrl, crawlEntireSite).catch(err => { ... });
-}
-```
-
-The crawler fetches up to 20 pages (same-domain only), extracts text from HTML, and tags each page's content with `[Page: URL]` markers:
-
-```
-[Page: https://example.com/hours]
-Monday-Friday: 6am-8pm...
-
-[Page: https://example.com/rates]
-Green fees start at $85...
-```
-
-### 3. Content gets chunked and embedded
-
-```javascript
-if (sourceType === 'manual' && content) {
-  processAndStoreChunks(item.id, content, userId, courseId, 'manual');
-}
-// For URL items, processAndStoreChunks is called inside crawlWebsite after fetching
-```
-
-`processAndStoreChunks()` in `services/embeddings.js`:
-
-```javascript
-async function processAndStoreChunks(knowledgeItemId, content, userId, courseId, sourceType) {
-  // 1. Delete old chunks
-  await KnowledgeChunk.destroy({ where: { knowledgeItemId } });
-
-  // 2. Chunk the content
-  let chunks;
-  if (sourceType === 'url' && content.includes('[Page:')) {
-    chunks = parseAndChunkCrawledContent(content);  // Preserves per-page sourceUrls
-  } else {
-    chunks = chunkText(content, null);
-  }
-
-  // 3. Generate embeddings in batch
-  const embeddings = await generateEmbeddings(chunks.map(c => c.content));
-
-  // 4. Insert with raw SQL for pgvector compatibility
-  for (let i = 0; i < chunks.length; i++) {
-    await sequelize.query(`
-      INSERT INTO knowledge_chunks 
-      ("knowledgeItemId", "userId", "courseId", content, "sourceUrl",
-       "chunkIndex", embedding, "tokenCount", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8, $9, $10)
-    `, { bind: [knowledgeItemId, userId, courseId, chunks[i].content,
-                chunks[i].sourceUrl, i, vectorString, tokenCount, now, now] });
-  }
-}
-```
-
----
-
-## The Read Path — Chat Uses Knowledge
-
-When a visitor sends a message in the widget, here's the full sequence:
-
-### 1. Widget sends message → `POST /api/widget/chat/stream`
-
-```javascript
-// widget/birdiebot-widget.js
-const response = await fetch(`${apiBaseUrl}/api/widget/chat/stream`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message: userMessage,
-    courseId: waitlistState.courseId,
-    conversationHistory: [],
-    sessionUuid: BirdieBotWidget.state.chatSessionUuid || null
-  })
-});
-```
-
-### 2. Route validates & creates session
-
-```javascript
-// routes/widget.js — POST /chat/stream
-const { message, courseId, conversationHistory, playerData, sessionUuid } = req.body;
-
-// Validation: message max 2,000 chars, history max 10 messages
-// Find or create ChatSession
-// Store user's ChatMessage
-```
-
-### 3. AI service searches knowledge base
-
-```javascript
-// services/aiChat.js — generateStreamingResponse()
-const searchResult = await searchKnowledgeBase(userId, course.id, userMessage);
-const context = searchResult.context;
-```
-
-### 4. Builds the message array for OpenAI
-
-```javascript
-const messages = [
-  { role: 'system', content: systemPrompt },         // Who you are, rules
-  { role: 'system', content: playerContext },          // "User is John Smith" (if known)
-  { role: 'system', content: context },               // Knowledge base results
-  ...conversationHistory.slice(-5),                    // Last 5 messages
-  { role: 'user',   content: userMessage }             // Current question
-];
-```
-
-### 5. Streams the response back
-
-```javascript
-const stream = await openai.chat.completions.create({
-  model: 'gpt-4o-mini',
-  messages,
-  temperature: 0.3,
-  max_tokens: 500,
-  stream: true
-});
-
-for await (const chunk of stream) {
-  const content = chunk.choices[0]?.delta?.content;
-  if (content) yield { type: 'chunk', data: content };
-}
-```
-
-### 6. Stores the bot response
-
-```javascript
-await ChatMessage.create({
-  message: fullResponse,
-  isFromBot: true,
-  chatSessionId: chatSession.id
-});
-```
-
----
-
-## Embedding Generation
-
-**Model:** `text-embedding-3-small` (1536 dimensions, ~$0.02 per 1M tokens)
-
-### Single embedding
-
-```javascript
-// services/embeddings.js
-async function generateEmbedding(text) {
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text.trim(),
-  });
-  return response.data[0].embedding;  // number[] of 1536 floats
-}
-```
-
-### Batch embeddings (for storing chunks)
-
-```javascript
-async function generateEmbeddings(texts) {
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: texts.map(t => t.trim()),
-  });
-  return response.data.map(d => d.embedding);
-}
-```
-
-### Vector format for PostgreSQL
-
-```javascript
-function embeddingToVectorString(embedding) {
-  return `[${embedding.join(',')}]`;  // → '[0.0123,0.0456,...]'
-}
-```
-
-Inserted with `$7::vector` cast so pgvector recognizes the type.
-
----
-
-## Chunking Strategy
-
-**Configuration:**
-- Target chunk size: **1,200 characters**
-- Overlap: **150 characters** (for context continuity across chunk boundaries)
-- Breaks at **sentence boundaries** (splits on `.!?` followed by whitespace)
-
-### Manual/document content
-
-```javascript
-function chunkText(text, sourceUrl = null) {
-  let cleanText = text.replace(/\s+/g, ' ').trim();
-
-  if (cleanText.length <= CHUNK_SIZE) {
-    return [{ content: cleanText, sourceUrl }];
-  }
-
-  const sentences = cleanText.split(/(?<=[.!?])\s+/);
-  let currentChunk = '';
-
-  for (const sentence of sentences) {
-    if (currentChunk.length + sentence.length > CHUNK_SIZE && currentChunk.length > 0) {
-      chunks.push({ content: currentChunk.trim(), sourceUrl });
-      // Overlap: carry last ~150 chars of context into next chunk
-      const words = currentChunk.split(' ');
-      const overlapWords = words.slice(-Math.ceil(CHUNK_OVERLAP / 5));
-      currentChunk = overlapWords.join(' ') + ' ' + sentence;
-    } else {
-      currentChunk += (currentChunk ? ' ' : '') + sentence;
-    }
-  }
-}
-```
-
-### URL content with page markers
-
-URL resources that crawl multiple pages produce content like:
-
-```
-[Page: https://example.com/hours]
-Open 7 days a week...
-
-[Page: https://example.com/rates]
-Green fees start at...
-```
-
-`parseAndChunkCrawledContent()` splits on `[Page: URL]` markers and chunks each page independently, preserving the `sourceUrl` per chunk for traceability.
-
----
-
-## Semantic + Hybrid Search
-
-The search uses a two-stage approach: **semantic retrieval** followed by **hybrid re-ranking**.
-
-### Stage 1: Semantic Search (pgvector)
-
-Generates an embedding for the user's query, then uses PostgreSQL's cosine distance operator (`<=>`) to find similar chunks:
+## 2. Database Schema
+
+### Tables
+
+#### `knowledge_sources`
+
+Parent record for each knowledge resource. Scoped by `workspace_id` (multi-tenant).
+
+| Column          | Type         | Description |
+|-----------------|--------------|-------------|
+| id              | uuid         | Primary key |
+| workspace_id    | uuid         | FK → workspaces (multi-tenant) |
+| name            | text         | Display name (often derived from content) |
+| type            | text         | `google_doc`, `google_sheet`, `airtable_table`, `markdown`, `website`, `text` |
+| config          | jsonb        | Source-specific: shareLink, baseId, tableId, url, etc. |
+| content         | text         | Raw fetched content (for markdown re-sync) |
+| comments        | text         | Admin notes / routing hints for the AI |
+| sync_status     | text         | `pending`, `syncing`, `synced`, `error` |
+| last_synced_at  | timestamptz  | Last successful sync |
+| chunk_count     | integer      | Number of chunks |
+| created_at      | timestamptz  | |
+| updated_at      | timestamptz  | |
+
+**Note:** `website` is used for URL crawling; the DB constraint may list `url` — add a migration if needed:  
+`check (type in (..., 'url', 'website'))` or map `website` → `url` in the API.
+
+#### `knowledge_chunks`
+
+Chunked + embedded pieces. This is what vector search queries against.
+
+| Column    | Type          | Description |
+|-----------|---------------|-------------|
+| id        | uuid          | Primary key |
+| source_id | uuid          | FK → knowledge_sources (CASCADE delete) |
+| content   | text          | Chunk text (~500–2000 chars) |
+| metadata  | jsonb         | chunkIndex, sourceName, sourceType, rowRange, fields, etc. |
+| embedding | vector(1536)  | OpenAI text-embedding-3-small |
+| created_at| timestamptz   | |
+
+#### Indexes
 
 ```sql
-SELECT 
-  kc.id, kc."knowledgeItemId", kc.content, kc."sourceUrl",
-  ki.name, ki."usageInstructions",
-  1 - (kc.embedding <=> $1::vector) as semantic_similarity
-FROM knowledge_chunks kc
-INNER JOIN knowledge_items ki ON kc."knowledgeItemId" = ki.id
-WHERE kc."userId" = $2 
-  AND kc."courseId" = $3
-  AND ki."isActive" = true
-  AND kc.embedding IS NOT NULL
-  AND 1 - (kc.embedding <=> $1::vector) > 0.2   -- Minimum similarity threshold
-ORDER BY kc.embedding <=> $1::vector
-LIMIT $4                                          -- 3x topK for re-ranking pool
+create index idx_chunks_source on knowledge_chunks(source_id);
+create index idx_chunks_embedding on knowledge_chunks 
+  using ivfflat (embedding vector_cosine_ops) with (lists = 100);
 ```
 
-### Stage 2: Keyword Extraction
+### Vector Search Function
 
-Removes stop words from the query, keeps terms > 2 characters:
-
-```javascript
-function extractKeywords(query) {
-  const stopWords = new Set(['what', 'when', 'where', 'how', ...]);
-  return query.toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .split(/\s+/)
-    .filter(word => word.length > 2 && !stopWords.has(word));
-}
+```sql
+create or replace function match_knowledge_chunks(
+  query_embedding vector(1536),
+  source_ids uuid[],
+  match_count int default 10,
+  match_threshold float default 0.7
+)
+returns table (
+  id uuid,
+  source_id uuid,
+  content text,
+  metadata jsonb,
+  similarity float
+)
+language plpgsql
+as $$
+begin
+  return query
+  select
+    kc.id,
+    kc.source_id,
+    kc.content,
+    kc.metadata,
+    1 - (kc.embedding <=> query_embedding) as similarity
+  from knowledge_chunks kc
+  where kc.source_id = any(source_ids)
+    and 1 - (kc.embedding <=> query_embedding) > match_threshold
+  order by kc.embedding <=> query_embedding
+  limit match_count;
+end;
+$$;
 ```
 
-### Stage 3: Hybrid Scoring
+The `<=>` operator is pgvector’s cosine distance. `1 - (a <=> b)` gives cosine similarity in [0, 1].
 
-Each candidate chunk gets a combined score:
+### RLS
 
-```javascript
-const SEMANTIC_WEIGHT = 0.7;
-const KEYWORD_WEIGHT = 0.3;
-
-const hybridScore = (SEMANTIC_WEIGHT * semanticScore) + (KEYWORD_WEIGHT * keywordScore);
-```
-
-Keyword scoring counts term matches with diminishing returns:
-
-```javascript
-function calculateKeywordScore(content, keywords) {
-  for (const keyword of keywords) {
-    const matches = contentLower.match(new RegExp(`\\b${keyword}\\b`, 'gi'));
-    if (matches) {
-      matchCount++;
-      weightedScore += Math.min(matches.length, 3) / 3;  // Cap at 3 occurrences
-    }
-  }
-  return (keywordRatio * 0.6) + (occurrenceScore * 0.4);
-}
-```
-
-### Stage 4: Filter & Return
-
-- Sort by hybrid score descending
-- Take top K (default 8 chunks)
-- Drop results with `hybridScore < 0.20`
+- `knowledge_sources`: workspace members can SELECT/INSERT; owners/admins can UPDATE/DELETE.
+- `knowledge_chunks`: access follows parent `knowledge_sources` via subquery.
 
 ---
 
-## Context Formatting for the AI
+## 3. Knowledge Source Types & Ingestion
 
-Search results are grouped by KnowledgeItem and formatted into a labeled text block that gets injected as a system message:
+| Type              | Input                   | How Content Is Fetched |
+|-------------------|-------------------------|--------------------------|
+| **google_doc**    | Share link              | `https://docs.google.com/document/d/{id}/export?format=txt` |
+| **google_sheet**  | Share link              | CSV export → convert to readable "Header: Value" rows |
+| **airtable_table**| Base ID, Table ID, API key, optional view/fields | Airtable REST API, paginate, format as `[Schema: ...]` + `Record: Name` blocks |
+| **markdown**      | Pasted/file content     | Stored directly |
+| **website**       | URL                     | Fetch root page, discover same-domain links, crawl up to ~20 pages, extract text with cheerio |
 
-```javascript
-function buildContextFromChunks(results) {
-  let context = 'KNOWLEDGE BASE INFORMATION:\n\n';
+### Google Doc
 
-  // Group chunks by parent KnowledgeItem
-  const byItem = new Map();
-  for (const { chunk, similarity } of results) {
-    // Group by knowledgeItemId...
-  }
+- Extract doc ID from URL: `/document/d/([a-zA-Z0-9_-]+)/`
+- Doc must be shared as "Anyone with the link"
+- Export as plain text
 
-  // Format each source
-  for (const [itemId, item] of byItem) {
-    context += `[Source 1: ${item.name}]\n`;
-    if (item.usageInstructions) {
-      context += `USAGE INSTRUCTIONS: ${item.usageInstructions}\n`;
-    }
-    context += 'CONTENT:\n';
-    for (const chunk of item.chunks) {
-      if (chunk.sourceUrl) context += `(From: ${chunk.sourceUrl})\n`;
-      context += `${chunk.content}\n\n`;
-    }
-  }
-  return context;
+### Google Sheet
+
+- Extract sheet ID from URL: `/spreadsheets/d/([a-zA-Z0-9_-]+)/`
+- Export as CSV
+- Convert to row-per-entry text: `Row N\nHeader: Value\nHeader: Value`
+
+### Airtable Table
+
+- Uses `workspace_airtable_keys` for API keys (one workspace can have multiple keys)
+- Paginate with `offset` until no more
+- Optional `viewId` and `selectedFields` to limit data
+- Format: `[Schema: field1 | field2 | ...]` then `Record: PrimaryValue\nfield: value`
+- Handles arrays (e.g. attachments) via `formatAirtableValue()`
+
+### Website Crawl
+
+- Fetch root page with `User-Agent: GlanceBot/1.0`
+- Parse links with cheerio; keep same-origin, same-domain only
+- Fetch child pages in batches of 5 with 200ms delay
+- Remove `script`, `style`, `nav`, `footer`, `iframe`, etc.
+- Preserve links as markdown `[text](url)` before text extraction
+- Output format: `Page: {title}\nURL: {url}\n\n{content}\n\n---\n\n` per page
+
+### Markdown / Text
+
+- Content stored in `knowledge_sources.content`
+- Re-sync re-chunks from stored content (no re-fetch)
+
+---
+
+## 4. The Write Path — Importing & Storing Knowledge
+
+### POST /api/knowledge — Create & Sync
+
+1. **Validate** workspace access (Supabase auth + `workspace_members`).
+2. **Validate** request body by type (shareLink, baseId/tableId, content, url, etc.).
+3. **Insert** `knowledge_sources` with `sync_status: 'syncing'`.
+4. **Fetch** content depending on type (see above).
+5. **Chunk** content (prose, tabular, or website-specific).
+6. **Generate embeddings** via OpenAI API (batched).
+7. **Insert** `knowledge_chunks` (batch of 50, fallback to single-row insert on error).
+8. **Update** `knowledge_sources`: `sync_status: 'synced'`, `chunk_count`, `last_synced_at`, `name` (derived from content).
+
+On failure: set `sync_status: 'error'` and return 500.
+
+### PUT /api/knowledge — Re-sync
+
+- Load existing source by id
+- Re-fetch content (or use stored `content` for markdown)
+- Delete existing chunks for that source
+- Re-chunk and re-embed
+- Update source record
+
+### DELETE /api/knowledge?id={sourceId}
+
+- Delete chunks (or rely on CASCADE)
+- Delete source
+
+### PATCH /api/knowledge — Update metadata
+
+- Update `name` and/or `comments` only (no re-sync)
+
+---
+
+## 5. Chunking Strategies
+
+### Prose (Google Doc, markdown)
+
+- **Target:** ~500 tokens (~2000 chars)
+- **Overlap:** ~50 tokens (~200 chars)
+- Split on paragraphs (`\n\n`), then sentences (`.!?`).
+- Overlap: carry last N chars from previous chunk into next.
+
+```typescript
+function chunkProseText(text: string, targetTokens = 500, overlapTokens = 50): string[]
+```
+
+### Tabular (Google Sheet, Airtable)
+
+- Split on row/record boundaries (`\n\n`).
+- Never split a row/record across chunks.
+- Pack full records until target size (~500 tokens, max ~4000 chars per chunk).
+- Prepend `[Schema: field1 | field2 | ...]` to each chunk so it’s self-describing.
+
+```typescript
+function chunkTabularText(text: string, targetTokens = 500): 
+  { text: string; startRow: number; endRow: number }[]
+```
+
+### Website
+
+- Content is already page-separated: `Page: ...\nURL: ...\n\n{content}\n\n---\n\n`.
+- Chunk each page’s content with `chunkProseText`.
+- Prefix each chunk with the page header (`Page: ...\nURL: ...`) so embeddings retain page context.
+
+```typescript
+function chunkWebsiteContent(content: string, targetTokens = 500, overlapTokens = 50): string[]
+```
+
+### Safety
+
+- Truncate any chunk > 4000 chars before embedding (OpenAI limit 8192 tokens).
+- Sanitize text for PostgreSQL: strip null bytes, control chars, lone surrogates.
+
+---
+
+## 6. Embedding Generation
+
+**Model:** `text-embedding-3-small` (1536 dimensions)
+
+### API Call
+
+```typescript
+const response = await fetch('https://api.openai.com/v1/embeddings', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    model: 'text-embedding-3-small',
+    input: batch, // string[] — can send multiple texts per request
+  }),
+})
+const embeddings = data.data.map(item => item.embedding)
+```
+
+### Batching
+
+- Batch by total chars (~1M per batch) to stay under token limits.
+- Rate limit 429: retry with backoff (5s, 10s, …).
+- Pause ~3s between batches to avoid TPM limits.
+
+### Storage
+
+- Store as JSON string or pgvector-compatible format.
+- Glance uses `JSON.stringify(embedding)` when passing to Supabase RPC; pgvector accepts arrays.
+
+---
+
+## 7. Vector Search (pgvector)
+
+### Calling `match_knowledge_chunks`
+
+```typescript
+const { data: chunks } = await supabase.rpc('match_knowledge_chunks', {
+  query_embedding: JSON.stringify(queryEmbedding), // number[] → string
+  source_ids: knowledgeSourceIds,                   // uuid[]
+  match_count: 30,                                  // fetch 3x for re-ranking
+  match_threshold: 0.12,                            // low to get more candidates
+})
+```
+
+### Hybrid Re-ranking
+
+Semantic search returns candidates. Then:
+
+1. **Extract keywords** from the user message (drop stop words, words ≤ 2 chars).
+2. **Keyword score** per chunk: match count + occurrence weighting (capped at 3 per term).
+3. **Hybrid score:** `0.7 * semantic_similarity + 0.3 * keyword_score`.
+4. Sort by hybrid score, take top 20.
+
+This improves results for very specific terms (names, IDs) that may not embed strongly.
+
+---
+
+## 8. Linking Knowledge to Chat Tabs
+
+### Tab configuration
+
+Tabs live inside `widgets.button_style.tabs` (JSONB array). Each tab can include:
+
+```typescript
+{
+  name: string,
+  type: 'AI Chat' | 'TLDR' | ...,
+  icon: string,
+  hash_trigger: string,
+  is_premium: boolean,
+  // Chat-specific:
+  knowledge_sources: string[],  // UUIDs of knowledge_sources
+  directive: string,            // Rich text (TipTap HTML)
+  failure_message: string,
+  welcome_message: string,
+  suggested_prompts: string[],
 }
 ```
 
-**Example output the AI sees:**
+### Dashboard flow
 
-```
-KNOWLEDGE BASE INFORMATION:
+1. **Chat tab editor** (`ChatTabEditor.tsx`): lists workspace knowledge sources, user can select which ones this tab uses.
+2. **Save** calls `onSave({ knowledge_sources: selectedIds })`.
+3. **TabEditor** merges into `tabs[tabIndex]` and updates `widgets.button_style`.
+4. `knowledge_sources` are stored as UUID strings in the tab config.
 
-[Source 1: Hours and Rates]
-USAGE INSTRUCTIONS: Use this for questions about pricing, hours, and seasonal rates
-CONTENT:
-(From: https://example.com/rates)
-Nov 3 - Mar 12 (Winter) Mon-Thu: up to $85, Fri-Sun: up to $95
-Mar 13 - May 7 (Early) Mon-Thu: $100, Fri-Sun: $130
-May 8 - Oct 18 (Peak Season) Mon-Thu: $140, Fri-Sun: $175
+### Chat API resolution
 
-[Source 2: Course Layout]
-CONTENT:
-18-hole championship course, par 72, 6,800 yards from the tips...
-```
-
-### Legacy Fallback
-
-If no chunks exist (pre-embeddings data), falls back to keyword search against `KnowledgeItem.content`:
-
-```javascript
-const items = await KnowledgeItem.findAll({
-  where: { userId, courseId, isActive: true, [Op.or]: searchConditions },
-  limit: 10
-});
-const context = buildContextLegacy(items);  // Truncates to 2,000 chars per item
-```
+- Chat API loads the widget by `widgetId`, reads `widget.button_style.tabs[tabIndex]`.
+- `tab.knowledge_sources` = array of UUIDs.
+- If none are valid UUIDs but the array is non-empty, fallback: use all synced sources in the widget’s workspace.
 
 ---
 
-## System Prompt Design
+## 9. The Read Path — Chat RAG Flow
 
-The system prompt (`buildSystemPrompt()` in `services/aiChat.js`) establishes strict rules:
+### POST /api/chat
 
-**Core rules:**
-1. Course-specific info → ONLY from knowledge base (never hallucinate)
-2. General golf knowledge → Allowed from training data (rules, terminology, tips)
-3. Unknown answers → Direct to pro shop with contact info
-4. All responses → Must be HTML formatted (`<p>`, `<strong>`, `<ul>`, `<li>`)
+**Body:** `{ widgetId, tabIndex, message, history = [] }`
 
-**Dynamic sections:**
-- Course name injected: *"You are a helpful assistant for {courseName}"*
-- Pro shop phone/email injected for fallback
-- Booking URL conditionally included with CTA links
-- Waitlist suggestion links (`<a href="#" data-trigger-waitlist="true">`)
+**Steps:**
 
-**Player personalization:**
-If the visitor is a known player (matched by email/phone from waitlist), a separate system message is added:
-
-```javascript
-if (playerData?.firstName) {
-  playerContext = `KNOWN USER: The user you are chatting with is ${playerData.firstName}...
-  Greet them by name naturally when appropriate.`;
-}
-```
+1. Load widget from DB; get `tabs = widget.button_style.tabs`, `tab = tabs[tabIndex]`.
+2. Resolve `knowledgeSourceIds` from `tab.knowledge_sources` (with UUID + fallback logic).
+3. Build search query: for short messages (< 60 chars) with history, concatenate recent user + assistant messages to improve context.
+4. Embed the search query with OpenAI.
+5. Call `match_knowledge_chunks` with `source_ids`, `match_count: 30`, `match_threshold: 0.12`.
+6. Hybrid re-rank (70% semantic, 30% keyword); keep top 20 chunks.
+7. Load source-level `comments` (routing hints) for `knowledgeSourceIds`.
+8. Build system prompt (see below).
+9. Invoke OpenAI Chat Completions with `stream: true`.
+10. Pipe response as SSE back to client.
 
 ---
 
-## OpenAI API Call
+## 10. Context Formatting for the LLM
 
-**Model:** `gpt-4o-mini` — fast and cost-effective
-**Temperature:** `0.3` — low for consistent, factual responses
-**Max tokens:** `500` — keeps responses concise
+### Structure
 
-```javascript
-const stream = await openai.chat.completions.create({
-  model: 'gpt-4o-mini',
-  messages: messages,
-  temperature: 0.3,
-  max_tokens: 500,
-  stream: true
-});
+```text
+## Knowledge Source Guide
+Use these descriptions to understand which source is relevant:
+- **Source Name**: Routing hint (from comments)
+...
+
+## Knowledge Context (YOUR ONLY SOURCE OF TRUTH)
+
+---
+[Source 1: Name] (type)
+Available fields: field1, field2, ...   # for tabular
+{chunk content}
+{chunk content}
+---
+[Source 2: Name] (type)
+{chunk content}
+---
 ```
 
-**Full message array order:**
+- Chunks grouped by source name.
+- For tabular sources, list available fields so the model knows the schema.
+- Source comments become the "Knowledge Source Guide" section.
 
-| # | Role | Content |
-|---|------|---------|
-| 1 | system | System prompt (role, rules, formatting) |
-| 2 | system | Player context (if known user) |
-| 3 | system | Knowledge base context (search results) |
-| 4-8 | user/assistant | Last 5 conversation messages |
-| 9 | user | Current message |
+### No matching chunks
+
+- If sources exist but no chunks match: instruct the model not to guess; suggest rephrasing or clarify that nothing was found.
+- If no sources are connected: instruct the model to refuse factual answers and only greet/redirect.
 
 ---
 
-## Streaming Responses (SSE)
+## 11. System Prompt Design
 
-The backend uses **Server-Sent Events** to stream the response token-by-token:
+### Order of sections
 
-### Backend (route)
+1. Role: "You are {widgetName}, an AI assistant..."
+2. Directive: customer instructions (tone, audience, rules).
+3. Grounding rules: only use knowledge context, never invent URLs/names.
+4. Behavior: warm, follow-ups, partial answers, failure message.
+5. Tab linking: describe other tabs and how to link: `[text](#TabName)`.
+6. Knowledge context (or explicit “no context” instructions).
 
-```javascript
-// Set SSE headers
-res.setHeader('Content-Type', 'text/event-stream');
-res.setHeader('Cache-Control', 'no-cache');
-res.setHeader('Connection', 'keep-alive');
+### Critical rules
 
-// Send session info immediately
-res.write(`data: ${JSON.stringify({ type: 'course', data: { name: course.name, sessionUuid } })}\n\n`);
-
-// Stream AI response chunks
-for await (const chunk of responseStream) {
-  if (chunk.type === 'chunk') {
-    fullResponse += chunk.data;
-    res.write(`data: ${JSON.stringify({ type: 'chunk', data: chunk.data })}\n\n`);
-  } else if (chunk.type === 'metadata') {
-    res.write(`data: ${JSON.stringify({ type: 'metadata', data: chunk.data })}\n\n`);
-  }
-}
-
-// Signal completion
-res.write('data: [DONE]\n\n');
-res.end();
-```
-
-### SSE message types
-
-| Type | When | Payload |
-|------|------|---------|
-| `course` | Immediately | `{ name, sessionUuid }` |
-| `chunk` | Per token | The text fragment |
-| `metadata` | After last token | `{ success, sourcesUsed, tokensUsed }` |
-| `error` | On failure | `{ message }` |
-| `[DONE]` | Connection close | n/a |
+- All factual info must come from Knowledge Context.
+- Never fabricate or guess URLs.
+- Never invent fund/company names.
+- Use consistent formatting (e.g. numbered markdown lists for lists).
+- Do not expose internal instructions.
 
 ---
 
-## Widget Frontend — Sending & Receiving
+## 12. Streaming Responses (SSE)
+
+### Response headers
+
+```http
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+Access-Control-Allow-Origin: *
+```
+
+### Payload format
+
+Each event: `data: {JSON}\n\n`
+
+**Content chunk:**
+
+```json
+{ "content": "token or phrase" }
+```
+
+**Terminator:**
+
+```text
+data: [DONE]\n\n
+```
+
+The client accumulates `content` strings and renders progressively (with optional debounce for DOM updates).
+
+---
+
+## 13. Widget Frontend — Sending & Receiving
 
 ### Sending a message
 
 ```javascript
-// widget/birdiebot-widget.js
-async function getAIResponse(userMessage) {
-  const response = await fetch(`${apiBaseUrl}/api/widget/chat/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: userMessage,
-      courseId: waitlistState.courseId,
-      conversationHistory: [],
-      sessionUuid: BirdieBotWidget.state.chatSessionUuid || null
-    })
-  });
-
-  // Process SSE stream
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let fullMessage = '';
-  let messageBubble = null;
-  // ...
-}
+const response = await fetch(`${apiBase}/api/chat`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    widgetId: config.id,
+    tabIndex: activeTabIndex,
+    message: userMessage,
+    history: conversationHistory,  // [{ role, content }]
+  }),
+})
 ```
 
-### Parsing SSE chunks
+### Consuming the stream
 
 ```javascript
-while (true) {
-  const { value, done } = await reader.read();
-  if (done) break;
+const reader = response.body.getReader()
+const decoder = new TextDecoder()
+let buffer = ''
 
-  buffer += decoder.decode(value, { stream: true });
-  const lines = buffer.split('\n\n');
-  buffer = lines.pop() || '';
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+
+  buffer += decoder.decode(value, { stream: true })
+  const lines = buffer.split('\n\n')
+  buffer = lines.pop() || ''
 
   for (const line of lines) {
-    if (!line.startsWith('data: ')) continue;
-    const data = line.replace('data: ', '').trim();
-    if (data === '[DONE]') break;
+    if (!line.startsWith('data: ')) continue
+    const raw = line.slice(6).trim()
+    if (raw === '[DONE]') break
 
-    const parsed = JSON.parse(data);
-
-    // Capture session UUID for subsequent messages
-    if (parsed.type === 'course' && parsed.data?.sessionUuid) {
-      BirdieBotWidget.state.chatSessionUuid = parsed.data.sessionUuid;
-    }
-
-    // Render text tokens progressively
-    if (parsed.type === 'chunk') {
-      if (!messageBubble) {
-        // Create the response bubble in the DOM
-      }
-      fullMessage += parsed.data?.content || parsed.data || '';
-      messageBubble.querySelector('div').innerHTML = fullMessage;
-      scrollChatToBottom();
+    const parsed = JSON.parse(raw)
+    if (parsed.content) {
+      fullMessage += parsed.content
+      messageBubble.innerHTML = renderMarkdown(fullMessage)
+      scrollToBottom()
     }
   }
 }
@@ -731,76 +563,70 @@ while (true) {
 
 ### UX flow
 
-1. User types message → send button triggers `getAIResponse()`
-2. Typing indicator appears (animated dots)
-3. SSE connection opens → typing indicator removed
-4. First `course` event → session UUID captured
-5. `chunk` events arrive → message bubble created, HTML updated progressively
-6. `[DONE]` → connection closes, chat auto-scrolls
+1. User types and sends (or clicks a suggested prompt).
+2. Show typing indicator.
+3. Stream tokens; update message bubble progressively.
+4. Optionally handle `[data-glance-tab]` links for in-widget tab switching.
 
 ---
 
-## Session Tracking
-
-Sessions use short IDs in the format `{courseId}-{6chars}` (e.g., `02-A3F8K2`):
-
-```javascript
-function generateSessionId(courseId) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `${String(courseId).padStart(2, '0')}-${result}`;
-}
-```
-
-- Session UUID is sent to the widget with the first SSE event
-- Widget stores it in `BirdieBotWidget.state.chatSessionUuid`
-- Subsequent messages include it so they're linked to the same session
-- If a known player (matched by email/phone from waitlist), `playerId` is attached to the session
-
----
-
-## Key Files Reference
+## 14. Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `models/KnowledgeItem.js` | Knowledge resource model (parent) |
-| `models/KnowledgeChunk.js` | Chunked + embedded pieces (pgvector) |
-| `models/ChatSession.js` | Conversation session tracking |
-| `models/ChatMessage.js` | Individual chat messages |
-| `models/index.js` | Model relationships |
-| `services/embeddings.js` | Chunking, embedding generation, semantic search |
-| `services/aiChat.js` | Knowledge search, prompt building, OpenAI calls |
-| `routes/knowledge.js` | CRUD API for knowledge items + web crawling |
-| `routes/widget.js` | Chat endpoints (streaming + non-streaming) |
-| `widget/birdiebot-widget.js` | Frontend widget — sends messages, renders SSE |
-| `package.json` | OpenAI dependency (`openai: ^6.8.1`) |
+| `apps/dashboard/src/app/api/knowledge/route.ts` | POST/PUT/DELETE/PATCH for knowledge sources; fetch, chunk, embed, insert |
+| `apps/dashboard/src/app/api/chat/route.ts` | RAG chat endpoint; vector search, hybrid re-rank, system prompt, streaming |
+| `apps/dashboard/src/app/w/[workspaceId]/knowledge/page.tsx` | Knowledge list + create UI |
+| `apps/dashboard/src/app/w/[workspaceId]/glances/[id]/tab/[tabIndex]/page.tsx` | Tab editor; fetches knowledge sources for chat tab |
+| `apps/dashboard/src/app/glances/[id]/tab/[tabIndex]/ChatTabEditor.tsx` | Chat tab config; knowledge source selection |
+| `apps/dashboard/src/app/glances/[id]/tab/[tabIndex]/TabEditor.tsx` | Saves tab config (including knowledge_sources) to widget |
+| `apps/dashboard/src/app/api/widget/[id]/config/route.ts` | Public widget config (tabs, prompts, auth) |
+| `apps/dashboard/public/widget.js` | Embedded widget; chat UI, fetch /api/chat, SSE handling |
+| `supabase/migrations/20260206000001_knowledge_tables.sql` | knowledge_sources, knowledge_chunks, match_knowledge_chunks |
 
 ### Dependencies
 
-```json
-"openai": "^6.8.1"
-```
-
-PostgreSQL with the **pgvector** extension enabled:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
+- **OpenAI API:** `text-embedding-3-small`, `gpt-4.1-mini` (or equivalent)
+- **pgvector:** PostgreSQL extension for `vector(1536)`
+- **cheerio:** HTML parsing for website crawl
+- **Supabase:** DB + Auth + RLS
 
 ---
 
-## Replication Checklist
+## 15. Replication Checklist
 
-To build this in another app:
+To replicate this in another project:
 
-1. **PostgreSQL + pgvector** — Enable the vector extension
-2. **Models** — Create KnowledgeItem (parent) and KnowledgeChunk (with `vector(1536)` column)
-3. **Embeddings service** — Chunk text, generate embeddings via OpenAI, store with raw SQL `$1::vector`
-4. **Search service** — Semantic search with `<=>` operator + keyword re-ranking
-5. **AI chat service** — System prompt + knowledge context + history → OpenAI chat completion
-6. **SSE streaming** — `text/event-stream` headers, `data: JSON\n\n` format, `[DONE]` terminator
-7. **Frontend** — `fetch()` with `ReadableStream` reader, parse SSE, render progressively
-8. **Session tracking** — Short session IDs, store messages for history
+1. **PostgreSQL + pgvector**  
+   - `create extension if not exists vector;`
+
+2. **Tables**  
+   - `knowledge_sources` (workspace/account-scoped)  
+   - `knowledge_chunks` with `embedding vector(1536)`
+
+3. **Search function**  
+   - `match_knowledge_chunks(query_embedding, source_ids, match_count, match_threshold)`
+
+4. **Knowledge API**  
+   - Create/update/delete sources  
+   - Per-type content fetching  
+   - Chunking (prose vs tabular vs website)  
+   - OpenAI embeddings  
+   - Insert chunks with embeddings  
+
+5. **Chat tab config**  
+   - Store `knowledge_sources` (UUID array) on each chat tab in your config (e.g. widget JSON).
+
+6. **Chat API**  
+   - Embed query (optionally with conversation context)  
+   - Vector search over selected sources  
+   - Hybrid re-ranking  
+   - Build system prompt with knowledge context  
+   - Stream OpenAI response as SSE  
+
+7. **Widget**  
+   - POST to chat API with `widgetId`, `tabIndex`, `message`, `history`  
+   - Parse SSE; accumulate and render tokens
+
+8. **RLS**  
+   - Scope `knowledge_sources` and `knowledge_chunks` to workspace/account for multi-tenancy.

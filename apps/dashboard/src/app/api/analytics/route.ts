@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     if (!widgets || widgets.length === 0) {
       return NextResponse.json({
-        stats: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, conversionRate: 0, changes: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, conversionRate: 0 } },
+        stats: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, messagesSent: 0, conversionRate: 0, changes: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, messagesSent: 0, conversionRate: 0 } },
         timeSeries: [],
         glances: [],
       })
@@ -84,6 +84,33 @@ export async function GET(request: NextRequest) {
       .eq('workspace_id', workspaceId)
       .gte('created_at', prevStart.toISOString())
       .lt('created_at', periodStart.toISOString())
+
+    // Messages sent (user messages in chat) — from widget_chat_messages
+    const { data: chatSessions } = await supabase
+      .from('widget_chat_sessions')
+      .select('id')
+      .in('widget_id', widgetIds)
+    const chatSessionIds = (chatSessions ?? []).map(s => s.id)
+    const messagesSentRes = chatSessionIds.length === 0
+      ? { count: 0 }
+      : await supabase
+          .from('widget_chat_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'user')
+          .in('chat_session_id', chatSessionIds)
+          .gte('created_at', periodStart.toISOString())
+          .lte('created_at', now.toISOString())
+    const prevMessagesSentRes = chatSessionIds.length === 0
+      ? { count: 0 }
+      : await supabase
+          .from('widget_chat_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'user')
+          .in('chat_session_id', chatSessionIds)
+          .gte('created_at', prevStart.toISOString())
+          .lt('created_at', periodStart.toISOString())
+    const messagesSent = messagesSentRes.count ?? 0
+    const prevMessagesSent = prevMessagesSentRes.count ?? 0
 
     // ===== STATS =====
     const calcStats = (evts: typeof events, addAccounts: number) => {
@@ -128,6 +155,7 @@ export async function GET(request: NextRequest) {
 
     const stats = {
       ...currentStats,
+      messagesSent,
       changes: {
         visitors: pctChange(currentStats.visitors, prevStats.visitors),
         widgetOpens: pctChange(currentStats.widgetOpens, prevStats.widgetOpens),
@@ -135,6 +163,7 @@ export async function GET(request: NextRequest) {
         usersCreated: pctChange(currentStats.usersCreated, prevStats.usersCreated),
         formSubmissions: pctChange(currentStats.formSubmissions, prevStats.formSubmissions),
         chatsInitiated: pctChange(currentStats.chatsInitiated, prevStats.chatsInitiated),
+        messagesSent: pctChange(messagesSent, prevMessagesSent),
         conversionRate: pctChange(currentStats.conversionRate, prevStats.conversionRate),
       },
     }
@@ -176,6 +205,22 @@ export async function GET(request: NextRequest) {
       accountsByDate.set(key, (accountsByDate.get(key) ?? 0) + 1)
     }
 
+    // Messages sent per day
+    const messagesByDate = new Map<string, number>()
+    if (chatSessionIds.length > 0) {
+      const { data: userMessages } = await supabase
+        .from('widget_chat_messages')
+        .select('created_at')
+        .eq('role', 'user')
+        .in('chat_session_id', chatSessionIds)
+        .gte('created_at', periodStart.toISOString())
+        .lte('created_at', now.toISOString())
+      for (const m of userMessages ?? []) {
+        const key = m.created_at.split('T')[0]
+        messagesByDate.set(key, (messagesByDate.get(key) ?? 0) + 1)
+      }
+    }
+
     const timeSeries = Array.from(dateMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, v]) => {
@@ -183,6 +228,7 @@ export async function GET(request: NextRequest) {
         const conversionRate = v.visitors.size > 0
           ? Math.round((v.uniqueOpens.size / v.visitors.size) * 1000) / 10
           : 0
+        const messagesSentDay = messagesByDate.get(date) ?? 0
         return {
           date,
           visitors: v.visitors.size,
@@ -191,6 +237,7 @@ export async function GET(request: NextRequest) {
           usersCreated: accts,
           formSubmissions: v.formSubmits,
           chatsInitiated: v.chatsStarted,
+          messagesSent: messagesSentDay,
           conversionRate,
         }
       })
