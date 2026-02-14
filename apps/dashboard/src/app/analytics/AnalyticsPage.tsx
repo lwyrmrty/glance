@@ -20,6 +20,7 @@ interface AnalyticsPageProps {
 
 interface Stats {
   visitors: number
+  pageViews: number
   widgetOpens: number
   uniqueWidgetOpens: number
   usersCreated: number
@@ -29,6 +30,7 @@ interface Stats {
   conversionRate: number
   changes: {
     visitors: number
+    pageViews: number
     widgetOpens: number
     uniqueWidgetOpens: number
     usersCreated: number
@@ -42,6 +44,7 @@ interface Stats {
 interface TimeSeriesPoint {
   date: string
   visitors: number
+  pageViews: number
   opens: number
   uniqueOpens: number
   usersCreated: number
@@ -73,13 +76,14 @@ const PERIODS = [
 
 const CHART_STATS = [
   { value: 'visitors', label: 'Total visitors', dataKey: 'visitors', format: 'number' },
+  { value: 'pageViews', label: 'Page views', dataKey: 'pageViews', format: 'number' },
   { value: 'widgetOpens', label: 'Widget opens', dataKey: 'opens', format: 'number' },
   { value: 'uniqueWidgetOpens', label: 'Unique widget opens', dataKey: 'uniqueOpens', format: 'number' },
   { value: 'usersCreated', label: 'Users created', dataKey: 'usersCreated', format: 'number' },
   { value: 'formSubmissions', label: 'Form submissions', dataKey: 'formSubmissions', format: 'number' },
   { value: 'chatsInitiated', label: 'Chats initiated', dataKey: 'chatsInitiated', format: 'number' },
   { value: 'messagesSent', label: 'Messages sent', dataKey: 'messagesSent', format: 'number' },
-  { value: 'conversionRate', label: 'Conversion rate', dataKey: 'conversionRate', format: 'pct' },
+  { value: 'conversionRate', label: 'Open rate (opens per page view)', dataKey: 'conversionRate', format: 'pct' },
 ] as const
 
 export function AnalyticsPage({ workspaceName, workspaceId, glances }: AnalyticsPageProps) {
@@ -87,17 +91,31 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
   const [chartStat, setChartStat] = useState<(typeof CHART_STATS)[number]['value']>('uniqueWidgetOpens')
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const fetchAnalytics = useCallback(async () => {
     if (!workspaceId) return
     setLoading(true)
+    setFetchError(null)
     try {
       const res = await fetch(`/api/analytics?workspace_id=${workspaceId}&period=${period}`)
       if (res.ok) {
         const json = await res.json()
         setData(json)
+      } else {
+        const body = await res.text()
+        let errMsg = `HTTP ${res.status}`
+        try {
+          const parsed = JSON.parse(body)
+          if (parsed.error) errMsg += `: ${parsed.error}`
+        } catch {
+          if (body) errMsg += ` — ${body.slice(0, 100)}`
+        }
+        setFetchError(errMsg)
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setFetchError(msg)
       console.error('Failed to fetch analytics:', err)
     } finally {
       setLoading(false)
@@ -163,16 +181,20 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
             {loading && !data ? (
               <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>Loading analytics...</div>
             ) : !data ? (
-              <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>Failed to load analytics.</div>
+              <div style={{ padding: '60px 0', textAlign: 'center' }}>
+                <div style={{ color: '#999', marginBottom: 8 }}>Failed to load analytics.</div>
+                {fetchError && <div style={{ fontSize: 13, color: '#ef4444' }}>{fetchError}</div>}
+              </div>
             ) : (
               <>
                 {/* ===== STAT CARDS (Row 1: traffic) ===== */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 16 }}>
                   {[
                     { label: 'Total Visitors', value: formatNumber(data.stats.visitors), change: data.stats.changes.visitors, icon: '/images/playerslite.svg' },
+                    { label: 'Page Views', value: formatNumber(data.stats.pageViews ?? 0), change: data.stats.changes.pageViews ?? 0, icon: '/images/playerslite.svg' },
                     { label: 'Widget Opens', value: formatNumber(data.stats.widgetOpens), change: data.stats.changes.widgetOpens, icon: '/images/glance-icon.svg' },
                     { label: 'Unique Widget Opens', value: formatNumber(data.stats.uniqueWidgetOpens), change: data.stats.changes.uniqueWidgetOpens, icon: '/images/glance-icon.svg' },
-                    { label: 'Conversion Rate', value: formatPct(data.stats.conversionRate), change: data.stats.changes.conversionRate, icon: '/images/conversion.svg' },
+                    { label: 'Open Rate', value: formatPct(data.stats.conversionRate), change: data.stats.changes.conversionRate, icon: '/images/conversion.svg' },
                   ].map((card, i) => (
                     <div key={i} className="contentblock" style={{ padding: 20 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -239,7 +261,7 @@ export function AnalyticsPage({ workspaceName, workspaceId, glances }: Analytics
                       </div>
                     </div>
                     <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>
-                      {chartStat === 'conversionRate' ? formatPct(data.stats.conversionRate) : formatNumber(data.stats[chartStat])}
+                      {chartStat === 'conversionRate' ? formatPct(data.stats.conversionRate) : formatNumber((data.stats as Record<string, number>)[chartStat] ?? 0)}
                     </div>
                     <ChangeIndicator value={data.stats.changes[chartStat]} />
                     <div style={{ height: 220, marginTop: 20 }}>

@@ -31,6 +31,7 @@ interface WidgetEvent {
 const VALID_EVENT_TYPES = new Set([
   'widget_opened',
   'tab_viewed',
+  'page_view',
   'form_submitted',
   'link_clicked',
   'chat_started',

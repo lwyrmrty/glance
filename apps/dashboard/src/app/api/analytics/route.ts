@@ -3,6 +3,27 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
+ * Paginated fetch — Supabase defaults to 1,000 rows per request.
+ * This helper fetches all matching rows by paging with .range().
+ * `buildQuery` should return a Supabase query builder (un-awaited).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchAllRows<T = any>(buildQuery: () => any): Promise<T[]> {
+  const PAGE = 1000
+  const all: T[] = []
+  let offset = 0
+  while (true) {
+    const { data, error } = await buildQuery().range(offset, offset + PAGE - 1)
+    if (error) throw error
+    const rows = (data ?? []) as T[]
+    all.push(...rows)
+    if (rows.length < PAGE) break
+    offset += PAGE
+  }
+  return all
+}
+
+/**
  * GET /api/analytics?workspace_id=...&period=7d|30d|90d
  *
  * Returns aggregated analytics for a workspace:
@@ -42,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     if (!widgets || widgets.length === 0) {
       return NextResponse.json({
-        stats: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, messagesSent: 0, conversionRate: 0, changes: { visitors: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, messagesSent: 0, conversionRate: 0 } },
+        stats: { visitors: 0, pageViews: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, messagesSent: 0, conversionRate: 0, changes: { visitors: 0, pageViews: 0, widgetOpens: 0, uniqueWidgetOpens: 0, usersCreated: 0, formSubmissions: 0, chatsInitiated: 0, messagesSent: 0, conversionRate: 0 } },
         timeSeries: [],
         glances: [],
       })
@@ -51,24 +72,25 @@ export async function GET(request: NextRequest) {
     const widgetIds = widgets.map(w => w.id)
     const widgetNameMap = Object.fromEntries(widgets.map(w => [w.id, w.name]))
 
-    // Fetch current period events
-    const { data: currentEvents } = await supabase
-      .from('widget_events')
-      .select('session_id, event_type, widget_id, created_at')
-      .in('widget_id', widgetIds)
-      .gte('created_at', periodStart.toISOString())
-      .lte('created_at', now.toISOString())
+    // Fetch current period events (paginated — Supabase defaults to 1,000 rows)
+    const events = await fetchAllRows<{ session_id: string; event_type: string; widget_id: string; created_at: string }>(() =>
+      supabase
+        .from('widget_events')
+        .select('session_id, event_type, widget_id, created_at')
+        .in('widget_id', widgetIds)
+        .gte('created_at', periodStart.toISOString())
+        .lte('created_at', now.toISOString())
+    )
 
     // Fetch previous period events (for change calculation)
-    const { data: prevEvents } = await supabase
-      .from('widget_events')
-      .select('session_id, event_type')
-      .in('widget_id', widgetIds)
-      .gte('created_at', prevStart.toISOString())
-      .lt('created_at', periodStart.toISOString())
-
-    const events = currentEvents ?? []
-    const prev = prevEvents ?? []
+    const prev = await fetchAllRows<{ session_id: string; event_type: string }>(() =>
+      supabase
+        .from('widget_events')
+        .select('session_id, event_type')
+        .in('widget_id', widgetIds)
+        .gte('created_at', prevStart.toISOString())
+        .lt('created_at', periodStart.toISOString())
+    )
 
     // Accounts created (widget_users) in current and previous period
     const { count: accountsCreated } = await supabase
@@ -86,11 +108,15 @@ export async function GET(request: NextRequest) {
       .lt('created_at', periodStart.toISOString())
 
     // Messages sent (user messages in chat) — from widget_chat_messages
-    const { data: chatSessions } = await supabase
-      .from('widget_chat_sessions')
-      .select('id')
-      .in('widget_id', widgetIds)
-    const chatSessionIds = (chatSessions ?? []).map(s => s.id)
+    // Fetch all chat session IDs for these widgets within the full date range (current + previous period)
+    const chatSessions = await fetchAllRows<{ id: string }>(() =>
+      supabase
+        .from('widget_chat_sessions')
+        .select('id')
+        .in('widget_id', widgetIds)
+        .gte('created_at', prevStart.toISOString())
+    )
+    const chatSessionIds = chatSessions.map(s => s.id)
     const messagesSentRes = chatSessionIds.length === 0
       ? { count: 0 }
       : await supabase
@@ -116,6 +142,7 @@ export async function GET(request: NextRequest) {
     const calcStats = (evts: typeof events, addAccounts: number) => {
       const sessions = new Map<string, Set<string>>()
       let totalOpens = 0
+      let pageViews = 0
       let formSubmits = 0
       let chatsStarted = 0
 
@@ -123,6 +150,7 @@ export async function GET(request: NextRequest) {
         if (!sessions.has(e.session_id)) sessions.set(e.session_id, new Set())
         sessions.get(e.session_id)!.add(e.event_type)
         if (e.event_type === 'widget_opened') totalOpens++
+        if (e.event_type === 'page_view') pageViews++
         if (e.event_type === 'form_submitted') formSubmits++
         if (e.event_type === 'chat_started') chatsStarted++
       }
@@ -134,14 +162,18 @@ export async function GET(request: NextRequest) {
         if (types.has('widget_opened')) uniqueWidgetOpensSessions++
       }
 
+      // Conversion rate = how often when a page is viewed, the widget is opened (opens per page view)
+      const conversionRate = pageViews > 0 ? Math.round((totalOpens / pageViews) * 1000) / 10 : 0
+
       return {
         visitors: totalSessions,
+        pageViews,
         widgetOpens: totalOpens,
         uniqueWidgetOpens: uniqueWidgetOpensSessions,
         usersCreated: addAccounts,
         formSubmissions: formSubmits,
         chatsInitiated: chatsStarted,
-        conversionRate: totalSessions > 0 ? Math.round((uniqueWidgetOpensSessions / totalSessions) * 1000) / 10 : 0,
+        conversionRate,
       }
     }
 
@@ -158,6 +190,7 @@ export async function GET(request: NextRequest) {
       messagesSent,
       changes: {
         visitors: pctChange(currentStats.visitors, prevStats.visitors),
+        pageViews: pctChange(currentStats.pageViews, prevStats.pageViews),
         widgetOpens: pctChange(currentStats.widgetOpens, prevStats.widgetOpens),
         uniqueWidgetOpens: pctChange(currentStats.uniqueWidgetOpens, prevStats.uniqueWidgetOpens),
         usersCreated: pctChange(currentStats.usersCreated, prevStats.usersCreated),
@@ -169,20 +202,21 @@ export async function GET(request: NextRequest) {
     }
 
     // ===== TIME SERIES =====
-    const dateMap = new Map<string, { visitors: Set<string>; opens: number; uniqueOpens: Set<string>; formSubmits: number; chatsStarted: number }>()
+    const dateMap = new Map<string, { visitors: Set<string>; pageViews: number; opens: number; uniqueOpens: Set<string>; formSubmits: number; chatsStarted: number }>()
 
-    // Pre-fill all days
-    for (let d = 0; d < days; d++) {
+    // Pre-fill all days (d <= days so today's bucket is always included)
+    for (let d = 0; d <= days; d++) {
       const date = new Date(periodStart.getTime() + d * 86400000)
       const key = date.toISOString().split('T')[0]
-      dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0, chatsStarted: 0 })
+      dateMap.set(key, { visitors: new Set(), pageViews: 0, opens: 0, uniqueOpens: new Set(), formSubmits: 0, chatsStarted: 0 })
     }
 
     for (const e of events) {
       const key = e.created_at.split('T')[0]
-      if (!dateMap.has(key)) dateMap.set(key, { visitors: new Set(), opens: 0, uniqueOpens: new Set(), formSubmits: 0, chatsStarted: 0 })
+      if (!dateMap.has(key)) dateMap.set(key, { visitors: new Set(), pageViews: 0, opens: 0, uniqueOpens: new Set(), formSubmits: 0, chatsStarted: 0 })
       const entry = dateMap.get(key)!
       entry.visitors.add(e.session_id)
+      if (e.event_type === 'page_view') entry.pageViews++
       if (e.event_type === 'widget_opened') {
         entry.opens++
         entry.uniqueOpens.add(e.session_id)
@@ -191,31 +225,35 @@ export async function GET(request: NextRequest) {
       if (e.event_type === 'chat_started') entry.chatsStarted++
     }
 
-    // Accounts created per day
-    const { data: newAccounts } = await supabase
-      .from('widget_users')
-      .select('created_at')
-      .eq('workspace_id', workspaceId)
-      .gte('created_at', periodStart.toISOString())
-      .lte('created_at', now.toISOString())
+    // Accounts created per day (paginated)
+    const newAccounts = await fetchAllRows<{ created_at: string }>(() =>
+      supabase
+        .from('widget_users')
+        .select('created_at')
+        .eq('workspace_id', workspaceId)
+        .gte('created_at', periodStart.toISOString())
+        .lte('created_at', now.toISOString())
+    )
 
     const accountsByDate = new Map<string, number>()
-    for (const a of newAccounts ?? []) {
+    for (const a of newAccounts) {
       const key = a.created_at.split('T')[0]
       accountsByDate.set(key, (accountsByDate.get(key) ?? 0) + 1)
     }
 
-    // Messages sent per day
+    // Messages sent per day (paginated)
     const messagesByDate = new Map<string, number>()
     if (chatSessionIds.length > 0) {
-      const { data: userMessages } = await supabase
-        .from('widget_chat_messages')
-        .select('created_at')
-        .eq('role', 'user')
-        .in('chat_session_id', chatSessionIds)
-        .gte('created_at', periodStart.toISOString())
-        .lte('created_at', now.toISOString())
-      for (const m of userMessages ?? []) {
+      const userMessages = await fetchAllRows<{ created_at: string }>(() =>
+        supabase
+          .from('widget_chat_messages')
+          .select('created_at')
+          .eq('role', 'user')
+          .in('chat_session_id', chatSessionIds)
+          .gte('created_at', periodStart.toISOString())
+          .lte('created_at', now.toISOString())
+      )
+      for (const m of userMessages) {
         const key = m.created_at.split('T')[0]
         messagesByDate.set(key, (messagesByDate.get(key) ?? 0) + 1)
       }
@@ -225,13 +263,14 @@ export async function GET(request: NextRequest) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, v]) => {
         const accts = accountsByDate.get(date) ?? 0
-        const conversionRate = v.visitors.size > 0
-          ? Math.round((v.uniqueOpens.size / v.visitors.size) * 1000) / 10
+        const conversionRate = v.pageViews > 0
+          ? Math.round((v.opens / v.pageViews) * 1000) / 10
           : 0
         const messagesSentDay = messagesByDate.get(date) ?? 0
         return {
           date,
           visitors: v.visitors.size,
+          pageViews: v.pageViews,
           opens: v.opens,
           uniqueOpens: v.uniqueOpens.size,
           usersCreated: accts,
